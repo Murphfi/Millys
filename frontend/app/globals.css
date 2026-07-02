@@ -117,6 +117,29 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+@layer utilities {
+  .glass-button {
+    position: relative;
+    overflow: hidden;
+  }
+  .glass-button::before {
+    content: "";
+    position: absolute;
+    inset: -40%;
+    background: radial-gradient(
+      180px circle at var(--x, 50%) var(--y, 50%),
+      rgba(255, 255, 255, 0.65),
+      transparent 65%
+    );
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+  }
+  .glass-button:hover::before {
+    opacity: 1;
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
