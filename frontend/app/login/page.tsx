@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Eye, EyeOff, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -14,8 +15,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-
-const USERS = ["Murphfas", "Lilly", "Test"];
 
 // Placeholder del espacio reservado para la mascota de Millys (aun sin diseñar).
 function MascotPlaceholder({ className }: { className?: string }) {
@@ -32,14 +31,45 @@ function MascotPlaceholder({ className }: { className?: string }) {
 }
 
 export default function LoginPage() {
+  const router = useRouter();
+  const [users, setUsers] = useState<string[]>([]);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  useEffect(() => {
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/users`)
+      .then((res) => res.json())
+      .then((data: string[]) => setUsers(data))
+      .catch(() => setUsers([]));
+  }, []);
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    // TODO: llamar a POST /api/auth/login cuando implementemos la logica.
-    console.log({ username, password });
+    setError("");
+    setLoading(true);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
+      if (res.ok) {
+        const { token } = await res.json();
+        const storage = rememberMe ? localStorage : sessionStorage;
+        storage.setItem("token", token);
+        router.push("/");
+      } else {
+        setError("Usuario o contraseña incorrectos");
+      }
+    } catch {
+      setError("No se pudo conectar con el servidor");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -57,7 +87,7 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} className="flex flex-1 flex-col justify-center gap-5">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="username">Usuario</Label>
-              <Select value={username} onValueChange={setUsername}>
+              <Select value={username || null} onValueChange={(value) => setUsername(value ?? "")}>
                 <SelectTrigger
                   id="username"
                   className="w-full justify-between rounded-none border-x-0 border-t-0 border-b border-input bg-transparent px-0 pb-2 focus-visible:ring-0 data-[state=open]:border-b-foreground"
@@ -65,7 +95,7 @@ export default function LoginPage() {
                   <SelectValue placeholder="Selecciona usuario" />
                 </SelectTrigger>
                 <SelectContent>
-                  {USERS.map((user) => (
+                  {users.map((user) => (
                     <SelectItem key={user} value={user}>
                       {user}
                     </SelectItem>
@@ -98,14 +128,23 @@ export default function LoginPage() {
 
             <div className="flex items-center justify-between text-sm">
               <label className="flex items-center gap-2 text-muted-foreground">
-                <Checkbox id="remember-me" />
+                <Checkbox
+                  id="remember-me"
+                  checked={rememberMe}
+                  onCheckedChange={(checked) => setRememberMe(checked === true)}
+                />
                 Recuérdame
               </label>
               <span className="text-muted-foreground">¿Olvidaste tu contraseña?</span>
             </div>
 
+            {error && (
+              <p className="text-sm text-red-500 text-center">{error}</p>
+            )}
+
             <Button
               type="submit"
+              disabled={loading}
               onMouseMove={(e) => {
                 const rect = e.currentTarget.getBoundingClientRect();
                 e.currentTarget.style.setProperty(
@@ -119,7 +158,7 @@ export default function LoginPage() {
               }}
               className="glass-button h-11 w-full rounded-full border-white/60 bg-white/25 bg-[radial-gradient(circle_at_center,rgba(167,139,250,0.55),rgba(252,211,77,0.3)_65%,transparent_85%)] bg-blend-overlay text-base text-zinc-900 shadow-[inset_0_1px_1px_rgba(255,255,255,0.8),inset_0_-8px_14px_-8px_rgba(129,140,248,0.35),0_10px_25px_-10px_rgba(99,102,241,0.45)] backdrop-blur-md transition-transform duration-300 ease-in-out hover:scale-[1.04] hover:bg-white/25 active:scale-95 dark:text-white"
             >
-              <span className="relative z-10">Entrar</span>
+              <span className="relative z-10">{loading ? "Entrando..." : "Entrar"}</span>
             </Button>
           </form>
         </div>
