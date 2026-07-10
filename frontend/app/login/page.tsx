@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 
 const USERS = ["Murphfas", "Lilly", "Test"];
 
-// Placeholder del espacio reservado para la mascota de Milty (aun sin diseñar).
+// Placeholder del espacio reservado para la mascota de Millys (aun sin diseñar).
 function MascotPlaceholder({ className }: { className?: string }) {
   return (
     <div
@@ -26,7 +26,7 @@ function MascotPlaceholder({ className }: { className?: string }) {
         className
       )}
     >
-      <span className="text-sm font-medium text-white/80">Milty (próximamente)</span>
+      <span className="text-sm font-medium text-white/80">Millys (próximamente)</span>
     </div>
   );
 }
@@ -51,7 +51,7 @@ export default function LoginPage() {
         <div className="flex flex-col gap-6 px-6 py-8 sm:px-10 sm:py-10">
           <div className="flex items-center justify-center gap-2 text-lg font-semibold">
             <Sparkles className="size-5" />
-            Milty
+            Millys
           </div>
 
           <form onSubmit={handleSubmit} className="flex flex-1 flex-col justify-center gap-5">

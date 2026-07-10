@@ -1,13 +1,13 @@
-package com.milty.backend;
+package com.millys.backend;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
-public class MiltyBackendApplication {
+public class MillysBackendApplication {
 
 	public static void main(String[] args) {
-		SpringApplication.run(MiltyBackendApplication.class, args);
+		SpringApplication.run(MillysBackendApplication.class, args);
 	}
 
 }

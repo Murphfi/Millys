@@ -1,4 +1,4 @@
-# Milty
+# Millys
 
 Esta primera versión, es un gestor de gastos mensuales en pareja que reemplaza un Excel compartido en Drive.
 Proyecto personal para practicar Spring Boot y tecnologías modernas.
@@ -14,7 +14,7 @@ Proyecto personal para practicar Spring Boot y tecnologías modernas.
 ## Estructura
 
 ```
-Milty/
+Millys/
 ├── backend/    ← Spring Boot
 └── frontend/   ← Next.js 15
 ```

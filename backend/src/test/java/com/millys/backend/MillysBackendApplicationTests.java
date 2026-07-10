@@ -1,10 +1,10 @@
-package com.milty.backend;
+package com.millys.backend;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest
-class MiltyBackendApplicationTests {
+class MillysBackendApplicationTests {
 
 	@Test
 	void contextLoads() {
