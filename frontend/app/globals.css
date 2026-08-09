@@ -118,25 +118,119 @@
 }
 
 @layer utilities {
-  .glass-button {
-    position: relative;
-    overflow: hidden;
+  /* ── Inputs ── */
+  .millys-input {
+    border-color: #DDD7CC;
+    transition: border-color 0.2s ease;
   }
-  .glass-button::before {
-    content: "";
+  .millys-input:focus,
+  .millys-input:focus-visible,
+  .millys-input[data-state="open"] {
+    border-color: #A78BFA;
+  }
+
+  /* ── Primary button ── */
+  .millys-btn {
+    transition: box-shadow 0.2s ease, transform 0.15s ease, opacity 0.2s ease;
+  }
+  .millys-btn:hover:not(:disabled) {
+    box-shadow: 0 6px 20px rgba(42, 39, 32, 0.18);
+  }
+
+  /* ── Bocadillo: bridge + corner system ───────────────────────────────────
+     The subscreen has left:20px, creating a 20px sage gap.
+     .millys-bridge fills that gap with white AT the active tab's height
+     (extending 20px above and below so the corners have white behind them).
+     .millys-corner-top / bottom are GREEN and sit on top of the bridge;
+     their border-radius reveals the white bridge beneath them.
+     Result: concave curves live 100% in the sage gap, never inside the card. */
+
+  .millys-bridge {
     position: absolute;
-    inset: -40%;
-    background: radial-gradient(
-      180px circle at var(--x, 50%) var(--y, 50%),
-      rgba(255, 255, 255, 0.65),
-      transparent 65%
-    );
-    opacity: 0;
-    transition: opacity 0.3s ease;
+    top: -20px;          /* extends 20px above the nav item = corner-top zone */
+    bottom: -20px;       /* extends 20px below = corner-bottom zone */
+    right: -20px;        /* into the 20px sage gap */
+    width: 20px;
+    background: #FAF9F7; /* card white */
     pointer-events: none;
+    z-index: 2;
   }
-  .glass-button:hover::before {
-    opacity: 1;
+
+  .millys-corner-top {
+    position: absolute;
+    top: -20px;          /* aligns with bridge top — same zone */
+    right: -20px;
+    width: 20px;
+    height: 20px;
+    background: #5E7C64; /* sage — covers the bridge except where radius bites */
+    border-bottom-right-radius: 20px; /* cutout at lower-right → reveals white bridge */
+    pointer-events: none;
+    z-index: 3;          /* above the bridge */
+  }
+
+  .millys-corner-bottom {
+    position: absolute;
+    bottom: -20px;       /* aligns with bridge bottom */
+    right: -20px;
+    width: 20px;
+    height: 20px;
+    background: #5E7C64;
+    border-top-right-radius: 20px;    /* cutout at upper-right → reveals white bridge */
+    pointer-events: none;
+    z-index: 3;
+  }
+}
+
+/* ── Millys character animations ── */
+/* Horizontal oscillation — constrained to left panel (~400px wide) */
+@keyframes millys-x {
+  0%   { transform: translateX(0); }
+  22%  { transform: translateX(115px); }
+  50%  { transform: translateX(-10px); }
+  78%  { transform: translateX(-110px); }
+  100% { transform: translateX(0); }
+}
+
+/* Vertical oscillation + depth scale — constrained to left panel (~500px tall) */
+@keyframes millys-y {
+  0%   { transform: translateY(-138px) scale(1.08); }
+  50%  { transform: translateY(128px)  scale(0.93); }
+  100% { transform: translateY(-138px) scale(1.08); }
+}
+
+/* Organic blob morphing */
+@keyframes millys-morph {
+  0%   { border-radius: 60% 40% 55% 45% / 50% 62% 38% 50%; }
+  15%  { border-radius: 45% 55% 38% 62% / 62% 44% 56% 38%; }
+  30%  { border-radius: 55% 45% 62% 38% / 38% 56% 44% 62%; }
+  48%  { border-radius: 38% 62% 44% 56% / 58% 38% 62% 42%; }
+  65%  { border-radius: 62% 38% 50% 50% / 44% 58% 42% 56%; }
+  80%  { border-radius: 50% 50% 38% 62% / 62% 44% 56% 38%; }
+  100% { border-radius: 60% 40% 55% 45% / 50% 62% 38% 50%; }
+}
+
+@keyframes millys-glow {
+  0%, 100% { box-shadow: 0 0 16px 4px rgba(16,14,28,0.22), 0 0 48px 8px rgba(16,14,28,0.08); }
+  50%       { box-shadow: 0 0 24px 8px rgba(16,14,28,0.32), 0 0 68px 14px rgba(16,14,28,0.12); }
+}
+
+/* SVG squish — used when character is SVG (no border-radius morph) */
+@keyframes millys-squish {
+  0%, 100% { transform: scale(1, 1); }
+  22%       { transform: scale(0.93, 1.07); }
+  44%       { transform: scale(1.07, 0.93); }
+  66%       { transform: scale(0.96, 1.05); }
+  84%       { transform: scale(1.05, 0.96); }
+}
+
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }
 
