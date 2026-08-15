@@ -223,14 +223,156 @@ export default function LoginPage() {
     }
   }
 
+  // ── Shared form content (used in both mobile and desktop) ─────────────
+  const formContent = (
+    <>
+      {/* Brand */}
+      <div style={{ marginBottom: 32, textAlign: "center" }}>
+        <h1
+          style={{
+            fontFamily: "var(--font-display), serif",
+            fontStyle: "italic",
+            fontWeight: 300,
+            fontSize: "3rem",
+            lineHeight: 1,
+            letterSpacing: "-0.02em",
+            fontVariationSettings: '"SOFT" 100, "WONK" 1',
+            color: "#1C1B29",
+          }}
+        >
+          Millys<span style={{ color: "#A78BFA" }}>.</span>
+        </h1>
+      </div>
+
+      <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+        <div className="flex flex-col gap-1.5">
+          <Label
+            htmlFor="username"
+            className="text-[10px] font-semibold uppercase tracking-widest"
+            style={{ color: "#9CA3AF" }}
+          >
+            Usuario
+          </Label>
+          <Select value={username} onValueChange={(v) => setUsername(v ?? "")}>
+            <SelectTrigger
+              id="username"
+              className="w-full justify-between rounded-none border-x-0 border-t-0 border-b bg-transparent px-0 pb-2 focus-visible:ring-0 millys-input"
+              style={{ color: "#1C1B29" }}
+            >
+              <SelectValue placeholder="Selecciona usuario" />
+            </SelectTrigger>
+            <SelectContent>
+              {users.map((u) => (
+                <SelectItem key={u} value={u}>{u}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <Label
+            htmlFor="password"
+            className="text-[10px] font-semibold uppercase tracking-widest"
+            style={{ color: "#9CA3AF" }}
+          >
+            Contraseña
+          </Label>
+          <div className="relative flex items-center">
+            <Input
+              id="password"
+              name="password"
+              type={showPassword ? "text" : "password"}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="h-auto rounded-none border-x-0 border-t-0 border-b bg-transparent px-0 pb-2 pr-7 focus-visible:ring-0 millys-input"
+              style={{ color: "#1C1B29" }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              className="absolute right-0 transition-opacity hover:opacity-60 cursor-pointer"
+              style={{ color: "#D1D5DB" }}
+              aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+            >
+              {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+            </button>
+          </div>
+        </div>
+
+        <div className="flex items-center">
+          <label
+            className="flex cursor-pointer items-center gap-2 text-sm"
+            style={{ color: "#6B7280" }}
+          >
+            <Checkbox
+              id="remember-me"
+              checked={rememberMe}
+              onCheckedChange={(c) => setRememberMe(c === true)}
+            />
+            Recuérdame
+          </label>
+        </div>
+
+        {error && (
+          <p className="text-sm" style={{ color: "#EF4444" }}>{error}</p>
+        )}
+
+        <button
+          type="submit"
+          disabled={loading || !username || !password}
+          className="millys-btn mt-1 h-11 w-full rounded-full text-sm font-semibold tracking-wide text-white active:scale-[0.98] disabled:opacity-40 cursor-pointer"
+          style={{
+            background: "#2A2720",
+            boxShadow: "0 4px 14px rgba(42,39,32,0.14)",
+          }}
+        >
+          {loading ? "Entrando..." : "Entrar"}
+        </button>
+      </form>
+    </>
+  );
+
   return (
     <div
       className="flex flex-1 min-h-screen items-center justify-center p-4 sm:p-6"
       style={{ background: "#F2EBE1" }}
     >
-      {/* Two-panel card */}
+      {/* ── Mobile card — illustration as full background ── */}
       <div
-        className="flex w-full overflow-hidden"
+        className="md:hidden relative w-full overflow-hidden"
+        style={{
+          borderRadius: 28,
+          minHeight: 520,
+          border: "1px solid rgba(0,0,0,0.05)",
+          boxShadow: "0 20px 60px rgba(42,39,32,0.10), 0 4px 14px rgba(42,39,32,0.05)",
+        }}
+      >
+        {/* Background illustration — swap <RoomBackground /> for <img> when the real artwork arrives */}
+        <div className="absolute inset-0">
+          <RoomBackground />
+        </div>
+
+        {/* Frosted glass form panel */}
+        <div className="relative flex items-center justify-center px-3 py-8" style={{ minHeight: 520 }}>
+          <div
+            style={{
+              width: "100%",
+              background: "rgba(250,249,247,0.68)",
+              backdropFilter: "blur(24px)",
+              WebkitBackdropFilter: "blur(24px)",
+              borderRadius: 20,
+              padding: "36px 24px",
+              boxShadow: "0 4px 24px rgba(42,39,32,0.08), 0 1px 4px rgba(42,39,32,0.04)",
+            }}
+          >
+            {formContent}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Desktop card — two-panel ── */}
+      <div
+        className="hidden md:flex w-full overflow-hidden"
         style={{
           maxWidth: 860,
           minHeight: 420,
@@ -239,126 +381,17 @@ export default function LoginPage() {
           boxShadow: "0 20px 60px rgba(42,39,32,0.10), 0 4px 14px rgba(42,39,32,0.05)",
         }}
       >
-        {/* ── Left panel — room illustration + Millys (static placeholder) ── */}
-        <div
-          className="hidden md:block relative overflow-hidden"
-          style={{ width: "42%", flexShrink: 0 }}
-        >
+        {/* Left panel — illustration */}
+        <div className="relative overflow-hidden" style={{ width: "42%", flexShrink: 0 }}>
           <RoomBackground />
         </div>
 
-        {/* ── Right panel — form ── */}
+        {/* Right panel — form */}
         <div
-          className="flex flex-col justify-center flex-1 min-w-0"
-          style={{ background: "#FAF9F7", padding: "44px 48px" }}
+          className="flex flex-col justify-center flex-1 min-w-0 millys-login-panel"
+          style={{ background: "#FAF9F7" }}
         >
-          {/* Brand — centered */}
-          <div style={{ marginBottom: 32, textAlign: "center" }}>
-            <h1
-              style={{
-                fontFamily: "var(--font-display), serif",
-                fontStyle: "italic",
-                fontWeight: 300,
-                fontSize: "3rem",
-                lineHeight: 1,
-                letterSpacing: "-0.02em",
-                fontVariationSettings: '"SOFT" 100, "WONK" 1',
-                color: "#1C1B29",
-              }}
-            >
-              Millys<span style={{ color: "#A78BFA" }}>.</span>
-            </h1>
-          </div>
-
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-            <div className="flex flex-col gap-1.5">
-              <Label
-                htmlFor="username"
-                className="text-[10px] font-semibold uppercase tracking-widest"
-                style={{ color: "#9CA3AF" }}
-              >
-                Usuario
-              </Label>
-              <Select
-                value={username}
-                onValueChange={(v) => setUsername(v)}
-              >
-                <SelectTrigger
-                  id="username"
-                  className="w-full justify-between rounded-none border-x-0 border-t-0 border-b bg-transparent px-0 pb-2 focus-visible:ring-0 millys-input"
-                  style={{ color: "#1C1B29" }}
-                >
-                  <SelectValue placeholder="Selecciona usuario" />
-                </SelectTrigger>
-                <SelectContent>
-                  {users.map((u) => (
-                    <SelectItem key={u} value={u}>{u}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <Label
-                htmlFor="password"
-                className="text-[10px] font-semibold uppercase tracking-widest"
-                style={{ color: "#9CA3AF" }}
-              >
-                Contraseña
-              </Label>
-              <div className="relative flex items-center">
-                <Input
-                  id="password"
-                  name="password"
-                  type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="h-auto rounded-none border-x-0 border-t-0 border-b bg-transparent px-0 pb-2 pr-7 focus-visible:ring-0 millys-input"
-                  style={{ color: "#1C1B29" }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((v) => !v)}
-                  className="absolute right-0 transition-opacity hover:opacity-60 cursor-pointer"
-                  style={{ color: "#D1D5DB" }}
-                  aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
-                >
-                  {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                </button>
-              </div>
-            </div>
-
-            <div className="flex items-center">
-              <label
-                className="flex cursor-pointer items-center gap-2 text-sm"
-                style={{ color: "#6B7280" }}
-              >
-                <Checkbox
-                  id="remember-me"
-                  checked={rememberMe}
-                  onCheckedChange={(c) => setRememberMe(c === true)}
-                />
-                Recuérdame
-              </label>
-            </div>
-
-            {error && (
-              <p className="text-sm" style={{ color: "#EF4444" }}>{error}</p>
-            )}
-
-            <button
-              type="submit"
-              disabled={loading || !username || !password}
-              className="millys-btn mt-1 h-11 w-full rounded-full text-sm font-semibold tracking-wide text-white active:scale-[0.98] disabled:opacity-40 cursor-pointer"
-              style={{
-                background: "#2A2720",
-                boxShadow: "0 4px 14px rgba(42,39,32,0.14)",
-              }}
-            >
-              {loading ? "Entrando..." : "Entrar"}
-            </button>
-          </form>
+          {formContent}
         </div>
       </div>
     </div>

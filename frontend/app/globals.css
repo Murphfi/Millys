@@ -129,6 +129,46 @@
     border-color: #A78BFA;
   }
 
+  /* ── RGB sliders (color picker) ── */
+  .millys-rgb-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 4px;
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+    flex: 1;
+  }
+  .millys-rgb-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: currentColor;
+    border: 2px solid #FAF9F7;
+    box-shadow: 0 1px 4px rgba(42,39,32,0.3);
+    cursor: pointer;
+  }
+  .millys-rgb-slider::-webkit-slider-runnable-track {
+    height: 4px;
+    border-radius: 2px;
+    background: inherit;
+  }
+  .millys-rgb-slider::-moz-range-track {
+    height: 4px;
+    border-radius: 2px;
+    background: inherit;
+  }
+  .millys-rgb-slider::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: currentColor;
+    border: 2px solid #FAF9F7;
+    box-shadow: 0 1px 4px rgba(42,39,32,0.3);
+    cursor: pointer;
+  }
+
   /* ── Primary button ── */
   .millys-btn {
     transition: box-shadow 0.2s ease, transform 0.15s ease, opacity 0.2s ease;
@@ -179,6 +219,47 @@
     pointer-events: none;
     z-index: 3;
   }
+
+  /* ── Hidden scrollbar ── */
+  .millys-scroll-hidden {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .millys-scroll-hidden::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* ── Mobile section cards (expenses page) ──
+     On mobile the body gets a warm sand background + gap,
+     each section becomes a #FAF9F7 rounded card nested inside.
+     Uses nested-rectangle depth cue — no shadows. */
+  @media (max-width: 767px) {
+    .millys-mobile-body {
+      background: #EDE8E0;
+      gap: 6px;
+      padding: 6px;
+    }
+    .millys-mobile-col {
+      gap: 6px;
+      background: #EDE8E0;
+    }
+    .millys-mobile-card {
+      border-radius: 12px;
+      overflow: hidden;
+      background: #FAF9F7;
+    }
+  }
+
+  /* Login right panel — responsive horizontal padding */
+  .millys-login-panel {
+    padding: 32px 28px;
+  }
+
+  @media (min-width: 640px) {
+    .millys-login-panel {
+      padding: 44px 48px;
+    }
+  }
 }
 
 /* ── Millys character animations ── */
@@ -221,6 +302,13 @@
   44%       { transform: scale(1.07, 0.93); }
   66%       { transform: scale(0.96, 1.05); }
   84%       { transform: scale(1.05, 0.96); }
+}
+
+/* Month strip active pill — spring pop */
+@keyframes millys-month-pop {
+  0%   { transform: scale(0.80); }
+  58%  { transform: scale(1.12); }
+  100% { transform: scale(1); }
 }
 
 
