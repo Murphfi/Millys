@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 export type Expense = {
   id: string;
@@ -67,7 +67,7 @@ function toPayload(partial: Omit<Expense, "id">): ExpensePayload {
   };
 }
 
-async function apiFetch(path: string, options: RequestInit = {}): Promise<Response> {
+export async function apiFetch(path: string, options: RequestInit = {}): Promise<Response> {
   return fetch(`${API_URL}${path}`, {
     ...options,
     headers: { "Content-Type": "application/json", "Authorization": `Bearer ${getToken()}`, ...options.headers },
@@ -97,8 +97,13 @@ const SEED_EXPENSES: Expense[] = [
 
 // ── Context ───────────────────────────────────────────────────────────────
 
+export type SyncErrorAction = "add" | "update" | "delete";
+
 type ExpensesCtx = {
   expenses: Expense[];
+  ready: boolean;
+  syncError: SyncErrorAction | null;
+  dismissSyncError: () => void;
   addExpense: (partial: Omit<Expense, "id">) => void;
   updateExpense: (id: string, partial: Omit<Expense, "id">) => void;
   deleteExpense: (id: string) => void;
@@ -106,6 +111,9 @@ type ExpensesCtx = {
 
 const ExpensesContext = createContext<ExpensesCtx>({
   expenses: [],
+  ready: false,
+  syncError: null,
+  dismissSyncError: () => {},
   addExpense: () => {},
   updateExpense: () => {},
   deleteExpense: () => {},
@@ -116,7 +124,10 @@ const ExpensesContext = createContext<ExpensesCtx>({
 export function ExpensesProvider({ children }: { children: React.ReactNode }) {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [ready, setReady]       = useState(false);
+  const [syncError, setSyncError] = useState<SyncErrorAction | null>(null);
   const test                    = useRef(false);   // true = Test user → localStorage
+
+  const dismissSyncError = useCallback(() => setSyncError(null), []);
 
   // ── Initial load ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -144,35 +155,50 @@ export function ExpensesProvider({ children }: { children: React.ReactNode }) {
 
   // ── CRUD ─────────────────────────────────────────────────────────────────
 
-  function addExpense(partial: Omit<Expense, "id">) {
+  const addExpense = useCallback((partial: Omit<Expense, "id">) => {
     if (test.current) {
       setExpenses(prev => [{ ...partial, id: crypto.randomUUID() }, ...prev]);
     } else {
       apiFetch("/api/expenses", { method: "POST", body: JSON.stringify(toPayload(partial)) })
-        .then(r => r.json())
+        .then(r => { if (!r.ok) throw new Error(); return r.json(); })
         .then((data: ApiExpense) => setExpenses(prev => [mapApi(data), ...prev]))
-        .catch(console.error);
+        .catch(() => setSyncError("add"));
     }
-  }
+  }, []);
 
-  function updateExpense(id: string, partial: Omit<Expense, "id">) {
-    setExpenses(prev => prev.map(e => e.id === id ? { ...e, ...partial } : e));
+  const updateExpense = useCallback((id: string, partial: Omit<Expense, "id">) => {
+    let rollback: Expense[] = [];
+    setExpenses(prev => {
+      rollback = prev;
+      return prev.map(e => e.id === id ? { ...e, ...partial } : e);
+    });
     if (!test.current) {
       apiFetch(`/api/expenses/${id}`, { method: "PUT", body: JSON.stringify(toPayload(partial)) })
-        .catch(console.error);
+        .then(r => { if (!r.ok) throw new Error(); })
+        .catch(() => { setExpenses(rollback); setSyncError("update"); });
     }
-  }
+  }, []);
 
-  function deleteExpense(id: string) {
-    setExpenses(prev => prev.filter(e => e.id !== id));
+  const deleteExpense = useCallback((id: string) => {
+    let rollback: Expense[] = [];
+    setExpenses(prev => {
+      rollback = prev;
+      return prev.filter(e => e.id !== id);
+    });
     if (!test.current) {
       apiFetch(`/api/expenses/${id}`, { method: "DELETE", headers: { "Content-Type": "" } })
-        .catch(console.error);
+        .then(r => { if (!r.ok) throw new Error(); })
+        .catch(() => { setExpenses(rollback); setSyncError("delete"); });
     }
-  }
+  }, []);
+
+  const value = useMemo(
+    () => ({ expenses, ready, syncError, dismissSyncError, addExpense, updateExpense, deleteExpense }),
+    [expenses, ready, syncError, dismissSyncError, addExpense, updateExpense, deleteExpense]
+  );
 
   return (
-    <ExpensesContext.Provider value={{ expenses, addExpense, updateExpense, deleteExpense }}>
+    <ExpensesContext.Provider value={value}>
       {children}
     </ExpensesContext.Provider>
   );

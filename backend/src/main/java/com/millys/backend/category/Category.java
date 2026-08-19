@@ -27,4 +27,7 @@ public class Category {
 
     @Column(name = "is_default", nullable = false)
     private boolean isDefault;
+
+    @Column(name = "no_description", nullable = false)
+    private boolean noDescription;
 }

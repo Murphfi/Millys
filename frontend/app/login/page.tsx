@@ -16,6 +16,12 @@ import {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
+// Fixed 3-user roster (Murphfi, Lilly, Test) — hardcoded on purpose, not fetched
+// pre-auth from the backend (that endpoint used to be public just for this dropdown,
+// which made username enumeration trivial for anyone). No user creation flow exists,
+// so this only needs updating if a 4th account is ever added by hand.
+const KNOWN_USERS = ["Murphfi", "Lilly", "Test"] as const;
+
 // ─── Cat room illustration ─────────────────────────────────────────────────
 function RoomBackground() {
   return (
@@ -179,21 +185,23 @@ function RoomBackground() {
 
 export default function LoginPage() {
   const router = useRouter();
-  const [users, setUsers] = useState<string[]>([]);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  // null = not yet determined (avoids a hydration mismatch); set once on mount.
+  // Gates which card mounts so the form (and its ids) exist exactly once instead of
+  // duplicated across mobile/desktop copies hidden with CSS.
+  const [isDesktop, setIsDesktop] = useState<boolean | null>(null);
 
   useEffect(() => {
-    const controller = new AbortController();
-    fetch(`${API_URL}/api/users`, { signal: controller.signal })
-      .then((res) => res.json())
-      .then((data: string[]) => setUsers(data))
-      .catch((err) => { if (err.name !== "AbortError") setUsers([]); });
-    return () => controller.abort();
+    const mq = window.matchMedia("(min-width: 768px)");
+    setIsDesktop(mq.matches);
+    const onChange = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
   }, []);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -262,7 +270,7 @@ export default function LoginPage() {
               <SelectValue placeholder="Selecciona usuario" />
             </SelectTrigger>
             <SelectContent>
-              {users.map((u) => (
+              {KNOWN_USERS.map((u) => (
                 <SelectItem key={u} value={u}>{u}</SelectItem>
               ))}
             </SelectContent>
@@ -332,14 +340,17 @@ export default function LoginPage() {
     </>
   );
 
+  // Breakpoint not yet known on first paint — render nothing rather than guess wrong.
+  if (isDesktop === null) return null;
+
   return (
     <div
       className="flex flex-1 min-h-screen items-center justify-center p-4 sm:p-6"
       style={{ background: "#F2EBE1" }}
     >
-      {/* ── Mobile card — illustration as full background ── */}
+      {!isDesktop ? (
       <div
-        className="md:hidden relative w-full overflow-hidden"
+        className="relative w-full overflow-hidden"
         style={{
           borderRadius: 28,
           minHeight: 520,
@@ -369,10 +380,9 @@ export default function LoginPage() {
           </div>
         </div>
       </div>
-
-      {/* ── Desktop card — two-panel ── */}
+      ) : (
       <div
-        className="hidden md:flex w-full overflow-hidden"
+        className="flex w-full overflow-hidden"
         style={{
           maxWidth: 860,
           minHeight: 420,
@@ -394,6 +404,7 @@ export default function LoginPage() {
           {formContent}
         </div>
       </div>
+      )}
     </div>
   );
 }

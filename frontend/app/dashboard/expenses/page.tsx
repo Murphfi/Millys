@@ -1,17 +1,23 @@
 "use client";
 
-import { useEffect, useRef, useState, useMemo, useCallback } from "react";
-import { Pencil, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
+import { useEffect, useRef, useState, useMemo, useCallback, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
+import { Pencil, Trash2, ChevronLeft, ChevronRight, X, TrendingUp, TrendingDown } from "lucide-react";
 import { useLang, getCategoryLabel } from "../lib/i18n";
 import { useCategories, type Category } from "../lib/categories";
 import { useExpenses, type Expense } from "../lib/expenses";
 import { ExpenseDialog } from "../add-expense-dialog";
+import {
+  CategoryBars, getMonthTotal, getMonthComparisonPct, getUserTotals, getPrevMonth,
+  getMonthGrid, toDateKey, todayDate as today, isSameDay as sameDay,
+} from "../lib/stats";
 
 const CHARCOAL = "#2A2720";
 const STONE    = "#78726A";
 const MUTED    = "#A09890";
 const BORDER   = "#EDE8DF";
 const CARD     = "#FAF9F7";
+const SAGE     = "#5E7C64";
 
 type ViewMode = "day" | "week" | "month";
 
@@ -20,29 +26,11 @@ type ViewMode = "day" | "week" | "month";
 
 function parseDate(iso: string): Date { return new Date(iso + "T12:00:00"); }
 
-function sameDay(a: Date, b: Date): boolean {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-}
-
 function getWeekStart(d: Date): Date {
   const out = new Date(d.getFullYear(), d.getMonth(), d.getDate());
   const dow = out.getDay();
   out.setDate(out.getDate() + (dow === 0 ? -6 : 1 - dow));
   return out;
-}
-
-function getMonthGrid(year: number, month: number): Date[] {
-  const first = new Date(year, month, 1);
-  const dow = first.getDay();
-  const start = new Date(year, month, 1 + (dow === 0 ? -6 : 1 - dow));
-  const grid = Array.from({ length: 42 }, (_, i) =>
-    new Date(start.getFullYear(), start.getMonth(), start.getDate() + i),
-  );
-  return grid[35].getMonth() !== month ? grid.slice(0, 35) : grid;
-}
-
-function toDateKey(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 function fmtCurrency(n: number): string {
@@ -85,6 +73,34 @@ function EmptyState({ label }: { label: string }) {
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", flex: 1, color: MUTED, fontSize: "0.8rem", letterSpacing: "0.01em" }}>
       {label}
+    </div>
+  );
+}
+
+
+function SyncErrorBanner({ message, onDismiss }: { message: string; onDismiss: () => void }) {
+  return (
+    <div
+      style={{
+        flexShrink: 0,
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        padding: "8px 16px",
+        background: "#FEF2F2",
+        borderBottom: `1px solid ${BORDER}`,
+        color: "#B91C1C",
+        fontSize: "0.78rem",
+      }}
+    >
+      <span style={{ flex: 1 }}>{message}</span>
+      <button
+        onClick={onDismiss}
+        aria-label="Cerrar"
+        style={{ background: "transparent", border: "none", cursor: "pointer", color: "#B91C1C", display: "flex", padding: 2 }}
+      >
+        <X size={13} strokeWidth={2} />
+      </button>
     </div>
   );
 }
@@ -402,107 +418,86 @@ function MonthStrip({ selectedDate, setSelectedDate, expenses }: {
   );
 }
 
-// ── Category bar chart ────────────────────────────────────────────────────────
-
-function CategoryBars({ expenses, month, year, getCat }: {
-  expenses: Expense[];
-  month: number;
-  year: number;
-  getCat: (id: string) => Category | undefined;
-}) {
-  const { t } = useLang();
-  const [animated, setAnimated] = useState(false);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setAnimated(true), 50);
-    return () => { clearTimeout(timer); setAnimated(false); };
-  }, [month]);
-
-  const entries = useMemo(() => {
-    const map: Record<string, { color: string; label: string; amount: number }> = {};
-    expenses
-      .filter(e => { const d = parseDate(e.date); return d.getMonth() === month && d.getFullYear() === year; })
-      .forEach(e => {
-        const cat = getCat(e.categoryId);
-        map[e.categoryId] ??= { color: cat?.color ?? MUTED, label: cat ? getCategoryLabel(cat, t) : e.categoryId, amount: 0 };
-        map[e.categoryId].amount += e.amount;
-      });
-    return Object.values(map).sort((a, b) => b.amount - a.amount);
-  }, [expenses, month, year, getCat, t]);
-
-  if (entries.length === 0) return null;
-
-  const maxAmt = entries[0].amount;
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
-      {entries.map(({ color, label, amount }, i) => (
-        <div key={label}>
-          <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 4 }}>
-            <span style={{ width: 5, height: 5, borderRadius: "50%", background: color, flexShrink: 0, display: "inline-block" }} />
-            <span style={{ fontSize: "0.595rem", fontWeight: 500, color: STONE, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
-              {label}
-            </span>
-            <span style={{ fontSize: "0.595rem", color: CHARCOAL, fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>
-              {fmtCurrency(amount)}
-            </span>
-          </div>
-          <div style={{ height: 5, background: "#EDE8DF", borderRadius: 999, overflow: "hidden" }}>
-            <div style={{
-              height: "100%",
-              width: animated ? `${(amount / maxAmt) * 100}%` : "0%",
-              background: color,
-              borderRadius: 999,
-              transition: "width 0.55s cubic-bezier(0.34, 1.56, 0.64, 1)",
-              transitionDelay: `${i * 60}ms`,
-            }} />
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
 
 // ── Month summary (total + category bars) ────────────────────────────────────
 
-function MonthSummary({ expenses, month, year, getCat }: {
+function MonthSummary({ expenses, month, year, getCat, selectedCategory, onSelectCategory }: {
   expenses: Expense[];
   month: number;
   year: number;
   getCat: (id: string) => Category | undefined;
+  selectedCategory?: string | null;
+  onSelectCategory?: (id: string | null) => void;
 }) {
   const { t } = useLang();
-  const monthTotal = useMemo(() =>
-    expenses
-      .filter(e => { const d = parseDate(e.date); return d.getMonth() === month && d.getFullYear() === year; })
-      .reduce((s, e) => s + e.amount, 0),
-    [expenses, month, year],
-  );
+  const monthTotal  = useMemo(() => getMonthTotal(expenses, month, year), [expenses, month, year]);
+  const userTotals  = useMemo(() => getUserTotals(expenses, month, year), [expenses, month, year]);
+  const pct         = useMemo(() => getMonthComparisonPct(expenses, month, year), [expenses, month, year]);
+  const prevMonth   = getPrevMonth(month, year).month;
+
   if (monthTotal === 0) return null;
+
+  // Down = calm sage (spending less isn't inherently "good", just gentler framing).
+  // Up = neutral stone, never red — this isn't an alert, just context.
+
   return (
     <>
       <span style={{ fontSize: "0.6rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: MUTED, display: "block", marginBottom: 5 }}>
         {t.expenses.total}
       </span>
       <Fraunces size="1.4rem">{fmtCurrency(monthTotal)}</Fraunces>
-      <span style={{ fontSize: "0.6rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: MUTED, display: "block", marginTop: 16, marginBottom: 8 }}>
-        {t.expenses.categoryTitle}
-      </span>
-      <CategoryBars expenses={expenses} month={month} year={year} getCat={getCat} />
+      {pct !== null && (
+        <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 6 }}>
+          {pct <= 0
+            ? <TrendingDown size={12} strokeWidth={2} color={SAGE} />
+            : <TrendingUp size={12} strokeWidth={2} color={STONE} />}
+          <span style={{ fontSize: "0.68rem", fontWeight: 600, color: pct <= 0 ? SAGE : STONE }}>
+            {pct > 0 ? "+" : ""}{Math.round(pct)}%
+          </span>
+          <span style={{ fontSize: "0.68rem", color: MUTED }}>
+            vs {t.calendar.months[prevMonth]}
+          </span>
+        </div>
+      )}
+      {userTotals.length > 1 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "3px 10px", marginTop: 8 }}>
+          {userTotals.map(([name, amount]) => (
+            <span key={name} style={{ display: "inline-flex", alignItems: "baseline", gap: 5, fontSize: "0.68rem", color: STONE, whiteSpace: "nowrap" }}>
+              {name}
+              <span style={{ color: CHARCOAL, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{fmtCurrency(amount)}</span>
+            </span>
+          ))}
+        </div>
+      )}
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginTop: 16, marginBottom: 8 }}>
+        <span style={{ fontSize: "0.6rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: MUTED }}>
+          {t.expenses.categoryTitle}
+        </span>
+        {selectedCategory != null && (
+          <button
+            onClick={() => onSelectCategory?.(null)}
+            style={{ background: "transparent", border: "none", cursor: "pointer", padding: 0, fontSize: "0.6rem", fontWeight: 600, color: SAGE, textDecoration: "underline", textUnderlineOffset: 2 }}
+          >
+            {t.expenses.clearFilter}
+          </button>
+        )}
+      </div>
+      <CategoryBars expenses={expenses} month={month} year={year} getCat={getCat} selected={selectedCategory} onSelect={onSelectCategory} />
     </>
   );
 }
 
 // ── Mini calendar (right panel) ───────────────────────────────────────────────
 
-function MiniCalendar({ selectedDate, setSelectedDate, expenses, getCat }: {
+function MiniCalendar({ selectedDate, setSelectedDate, expenses, getCat, categoryFilter, onCategoryFilterChange }: {
   selectedDate: Date;
   setSelectedDate: (d: Date) => void;
   expenses: Expense[];
   getCat: (id: string) => Category | undefined;
+  categoryFilter?: string | null;
+  onCategoryFilterChange?: (id: string | null) => void;
 }) {
   const { t } = useLang();
-  const today = useMemo(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }, []);
 
   const month = selectedDate.getMonth();
   const year  = selectedDate.getFullYear();
@@ -540,7 +535,7 @@ function MiniCalendar({ selectedDate, setSelectedDate, expenses, getCat }: {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: "1px 0" }}>
         {grid.map((day, idx) => {
           const inMonth   = day.getMonth() === month;
-          const isToday   = sameDay(day, today);
+          const isToday   = sameDay(day, today());
           const isSel     = sameDay(day, selectedDate);
           const dayExps   = expByDate[toDateKey(day)] ?? [];
           const dotColors = [...new Set(dayExps.map(e => getCat(e.categoryId)?.color ?? MUTED))].slice(0, 3);
@@ -579,7 +574,7 @@ function MiniCalendar({ selectedDate, setSelectedDate, expenses, getCat }: {
 
       {/* Desktop-only: total + category bars */}
       <div className="hidden md:block" style={{ marginTop: 4, paddingTop: 12, borderTop: `1px solid ${BORDER}` }}>
-        <MonthSummary expenses={expenses} month={month} year={year} getCat={getCat} />
+        <MonthSummary expenses={expenses} month={month} year={year} getCat={getCat} selectedCategory={categoryFilter} onSelectCategory={onCategoryFilterChange} />
       </div>
     </div>
   );
@@ -594,7 +589,6 @@ function DayView({ expenses, selectedDate, setSelectedDate, getCat }: {
   getCat: (id: string) => Category | undefined;
 }) {
   const { t } = useLang();
-  const today = useMemo(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }, []);
 
   const dayExps = useMemo(() =>
     expenses
@@ -602,7 +596,7 @@ function DayView({ expenses, selectedDate, setSelectedDate, getCat }: {
       .sort((a, b) => parseDate(b.date).getTime() - parseDate(a.date).getTime()),
     [expenses, selectedDate],
   );
-  const isToday = sameDay(selectedDate, today);
+  const isToday = sameDay(selectedDate, today());
 
   function shiftDay(d: number) {
     const next = new Date(selectedDate);
@@ -644,6 +638,39 @@ function DayView({ expenses, selectedDate, setSelectedDate, getCat }: {
   );
 }
 
+// ── Day-grouped list (shared by Week and Month views) ─────────────────────────
+
+function DayGroupedList({ groups, getCat, t, emptyLabel }: {
+  groups: { key: string; day: Date; exps: Expense[] }[];
+  getCat: (id: string) => Category | undefined;
+  t: ReturnType<typeof useLang>["t"];
+  emptyLabel: string;
+}) {
+  return (
+    <div className="millys-scroll-hidden" style={{ flex: 1, overflowY: "auto", padding: "14px 16px 20px" }}>
+      {groups.length === 0 ? (
+        <EmptyState label={emptyLabel} />
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+          {groups.map(({ key, day, exps }) => {
+            const isToday  = sameDay(day, today());
+            const dayTotal = exps.reduce((s, e) => s + e.amount, 0);
+            const label    = `${t.expenses.weekDays[wdIdx(day)]} ${day.getDate()}`;
+            return (
+              <DaySection key={key} label={label} total={dayTotal} count={exps.length} isToday={isToday} todayLabel={t.expenses.today}>
+                {exps.map(e => {
+                  const cat = getCat(e.categoryId);
+                  return <KanbanCard key={e.id} expense={e} catColor={cat?.color ?? MUTED} catLabel={cat ? getCategoryLabel(cat, t) : e.categoryId} />;
+                })}
+              </DaySection>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Week view ─────────────────────────────────────────────────────────────────
 
 function WeekView({ expenses, selectedDate, setSelectedDate, getCat }: {
@@ -653,7 +680,6 @@ function WeekView({ expenses, selectedDate, setSelectedDate, getCat }: {
   getCat: (id: string) => Category | undefined;
 }) {
   const { t } = useLang();
-  const today = useMemo(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }, []);
 
   const weekStart = getWeekStart(selectedDate);
   const weekEnd   = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 6);
@@ -694,27 +720,12 @@ function WeekView({ expenses, selectedDate, setSelectedDate, getCat }: {
         <NavBtn onClick={() => shiftWeek(1)}><ChevronRight size={15} strokeWidth={1.8} /></NavBtn>
       </div>
 
-      <div className="millys-scroll-hidden" style={{ flex: 1, overflowY: "auto", padding: "14px 16px 20px" }}>
-        {byDay.length === 0 ? (
-          <EmptyState label={t.expenses.empty} />
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-            {byDay.map(({ day, exps }) => {
-              const isToday  = sameDay(day, today);
-              const dayTotal = exps.reduce((s, e) => s + e.amount, 0);
-              const label    = `${t.expenses.weekDays[wdIdx(day)]} ${day.getDate()}`;
-              return (
-                <DaySection key={toDateKey(day)} label={label} total={dayTotal} count={exps.length} isToday={isToday} todayLabel={t.expenses.today}>
-                  {exps.map(e => {
-                    const cat = getCat(e.categoryId);
-                    return <KanbanCard key={e.id} expense={e} catColor={cat?.color ?? MUTED} catLabel={cat ? getCategoryLabel(cat, t) : e.categoryId} />;
-                  })}
-                </DaySection>
-              );
-            })}
-          </div>
-        )}
-      </div>
+      <DayGroupedList
+        groups={byDay.map(({ day, exps }) => ({ key: toDateKey(day), day, exps }))}
+        getCat={getCat}
+        t={t}
+        emptyLabel={t.expenses.empty}
+      />
     </div>
   );
 }
@@ -727,7 +738,6 @@ function MonthView({ expenses, selectedDate, getCat }: {
   getCat: (id: string) => Category | undefined;
 }) {
   const { t } = useLang();
-  const today = useMemo(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }, []);
 
   const month = selectedDate.getMonth();
   const year  = selectedDate.getFullYear();
@@ -748,28 +758,12 @@ function MonthView({ expenses, selectedDate, getCat }: {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
-      <div className="millys-scroll-hidden" style={{ flex: 1, overflowY: "auto", padding: "14px 16px 20px" }}>
-        {byDay.length === 0 ? (
-          <EmptyState label={t.expenses.empty} />
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-            {byDay.map(({ date, exps }) => {
-              const day      = parseDate(date);
-              const isToday  = sameDay(day, today);
-              const dayTotal = exps.reduce((s, e) => s + e.amount, 0);
-              const label    = `${t.expenses.weekDays[wdIdx(day)]} ${day.getDate()}`;
-              return (
-                <DaySection key={date} label={label} total={dayTotal} count={exps.length} isToday={isToday} todayLabel={t.expenses.today}>
-                  {exps.map(e => {
-                    const cat = getCat(e.categoryId);
-                    return <KanbanCard key={e.id} expense={e} catColor={cat?.color ?? MUTED} catLabel={cat ? getCategoryLabel(cat, t) : e.categoryId} />;
-                  })}
-                </DaySection>
-              );
-            })}
-          </div>
-        )}
-      </div>
+      <DayGroupedList
+        groups={byDay.map(({ date, exps }) => ({ key: date, day: parseDate(date), exps }))}
+        getCat={getCat}
+        t={t}
+        emptyLabel={t.expenses.empty}
+      />
     </div>
   );
 }
@@ -782,14 +776,46 @@ const MIN_RIGHT_W    = 340;
 const RIGHT_W_KEY    = "millys_right_panel_w";
 
 export default function ExpensesPage() {
+  return (
+    <Suspense fallback={null}>
+      <ExpensesPageInner />
+    </Suspense>
+  );
+}
+
+// useSearchParams() (for the ?category= deep link from Home) requires a Suspense
+// boundary around its caller in the App Router — the wrapper above provides it.
+function ExpensesPageInner() {
   const [categories]      = useCategories();
-  const { expenses }      = useExpenses();
+  const { expenses, ready, syncError, dismissSyncError } = useExpenses();
+  const { t }              = useLang();
+  const searchParams       = useSearchParams();
   const now = new Date();
 
-  const [viewMode, setViewMode] = useState<ViewMode>("month");
-  const [selectedDate, setSelectedDate] = useState(() =>
-    new Date(now.getFullYear(), now.getMonth(), now.getDate()),
+  useEffect(() => {
+    if (!syncError) return;
+    const timer = setTimeout(dismissSyncError, 6000);
+    return () => clearTimeout(timer);
+  }, [syncError, dismissSyncError]);
+
+  // Deep-linked from Home (?category=xyz, ?date=yyyy-mm-dd&view=day) — read once on
+  // mount, then behave as normal state. Takes precedence over the sessionStorage
+  // restore below, since arriving via a link is a more specific intent than whatever
+  // was left over from the last visit.
+  const deepLinkedDate = searchParams.get("date");
+  const deepLinkedView = searchParams.get("view") as ViewMode | null;
+
+  const [viewMode, setViewMode] = useState<ViewMode>(() =>
+    deepLinkedView && ["day", "week", "month"].includes(deepLinkedView) ? deepLinkedView : "month",
   );
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(() => searchParams.get("category"));
+  const [selectedDate, setSelectedDate] = useState(() => {
+    if (deepLinkedDate) {
+      const parts = deepLinkedDate.split("-").map(Number);
+      if (parts.length === 3) return new Date(parts[0], parts[1] - 1, parts[2]);
+    }
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  });
   const [rightWidth, setRightWidth] = useState(MIN_RIGHT_W);
   const [isDesktop,  setIsDesktop]  = useState(false);
 
@@ -799,15 +825,20 @@ export default function ExpensesPage() {
   const dragStartW     = useRef(0);
   const currentW       = useRef(MIN_RIGHT_W);
 
-  // Restore persisted state after hydration (survives devtools responsive-mode reloads)
+  // Restore persisted state after hydration (survives devtools responsive-mode reloads).
+  // Skipped when a deep link provided its own date/view — that intent wins.
   useEffect(() => {
-    const rawDate = sessionStorage.getItem(SESSION_DATE);
-    if (rawDate) {
-      const parts = rawDate.split("-").map(Number);
-      if (parts.length === 3) setSelectedDate(new Date(parts[0], parts[1] - 1, parts[2]));
+    if (!deepLinkedDate) {
+      const rawDate = sessionStorage.getItem(SESSION_DATE);
+      if (rawDate) {
+        const parts = rawDate.split("-").map(Number);
+        if (parts.length === 3) setSelectedDate(new Date(parts[0], parts[1] - 1, parts[2]));
+      }
     }
-    const rawView = sessionStorage.getItem(SESSION_VIEW) as ViewMode | null;
-    if (rawView && ["day", "week", "month"].includes(rawView)) setViewMode(rawView);
+    if (!deepLinkedView) {
+      const rawView = sessionStorage.getItem(SESSION_VIEW) as ViewMode | null;
+      if (rawView && ["day", "week", "month"].includes(rawView)) setViewMode(rawView);
+    }
 
     const savedW = parseInt(localStorage.getItem(RIGHT_W_KEY) ?? "");
     if (!isNaN(savedW) && savedW >= MIN_RIGHT_W) { setRightWidth(savedW); currentW.current = savedW; }
@@ -854,10 +885,25 @@ export default function ExpensesPage() {
 
   function getCat(id: string) { return categories.find(c => c.id === id); }
 
-  const shared = { expenses, selectedDate, setSelectedDate: updateDate, getCat };
+  // Category filter narrows the expense LIST only — the calendar dots and the
+  // category bars themselves keep showing the full month, so you can still see
+  // what you'd be switching to and clear the filter without losing context.
+  const listExpenses = categoryFilter ? expenses.filter(e => e.categoryId === categoryFilter) : expenses;
+
+  const shared = { expenses: listExpenses, selectedDate, setSelectedDate: updateDate, getCat };
+
+  if (!ready) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
+        <EmptyState label={t.expenses.loading} />
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
+      {syncError && <SyncErrorBanner message={t.errors[syncError]} onDismiss={dismissSyncError} />}
+
       {/* Month + year scroll strip */}
       <MonthStrip selectedDate={selectedDate} setSelectedDate={updateDate} expenses={expenses} />
 
@@ -868,11 +914,11 @@ export default function ExpensesPage() {
           <div className="millys-mobile-card" style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column", minHeight: 0 }}>
             {viewMode === "day"   && <DayView   {...shared} />}
             {viewMode === "week"  && <WeekView  {...shared} />}
-            {viewMode === "month" && <MonthView selectedDate={selectedDate} expenses={expenses} getCat={getCat} />}
+            {viewMode === "month" && <MonthView selectedDate={selectedDate} expenses={listExpenses} getCat={getCat} />}
           </div>
           {/* Mobile-only: total + bars after the expense list */}
           <div className="md:hidden millys-mobile-card" style={{ flexShrink: 0, padding: "14px 16px 20px" }}>
-            <MonthSummary expenses={expenses} month={selectedDate.getMonth()} year={selectedDate.getFullYear()} getCat={getCat} />
+            <MonthSummary expenses={expenses} month={selectedDate.getMonth()} year={selectedDate.getFullYear()} getCat={getCat} selectedCategory={categoryFilter} onSelectCategory={setCategoryFilter} />
           </div>
         </div>
 
@@ -913,7 +959,7 @@ export default function ExpensesPage() {
           <div style={{ flexShrink: 0, display: "flex", justifyContent: "center", padding: "10px 16px 9px", borderBottom: `1px solid ${BORDER}` }}>
             <ViewTabs active={viewMode} onChange={updateView} />
           </div>
-          <MiniCalendar {...shared} />
+          <MiniCalendar selectedDate={selectedDate} setSelectedDate={updateDate} expenses={expenses} getCat={getCat} categoryFilter={categoryFilter} onCategoryFilterChange={setCategoryFilter} />
         </div>
       </div>
     </div>

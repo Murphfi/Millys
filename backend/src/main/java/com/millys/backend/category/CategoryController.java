@@ -25,6 +25,7 @@ public class CategoryController {
         cat.setLabel(req.label());
         cat.setColor(req.color());
         cat.setDefault(false);
+        cat.setNoDescription(req.noDescription() != null && req.noDescription());
         return categoryRepository.save(cat);
     }
 
@@ -34,6 +35,7 @@ public class CategoryController {
                 .map(cat -> {
                     cat.setLabel(req.label());
                     cat.setColor(req.color());
+                    if (req.noDescription() != null) cat.setNoDescription(req.noDescription());
                     return ResponseEntity.ok(categoryRepository.save(cat));
                 })
                 .orElse(ResponseEntity.notFound().build());

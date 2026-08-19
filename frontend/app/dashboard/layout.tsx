@@ -36,6 +36,11 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { t }   = useLang();
   const [username, setUsername] = useState("");
+  // null = not yet determined (avoids a hydration mismatch); set once on mount.
+  // Gates which layout branch mounts so page content and dialogs exist exactly once —
+  // rendering both and hiding one with CSS let Radix dialog portals (which escape to
+  // document.body) stay open-but-invisible across a breakpoint-crossing resize.
+  const [isDesktop, setIsDesktop] = useState<boolean | null>(null);
 
   // Build translated nav items on each render
   const navItems = NAV_ROUTES.map(r => ({ ...r, label: t.nav[r.key] }));
@@ -45,6 +50,14 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
     if (!token) { router.replace("/login"); return; }
     setUsername(decodeUsername(token));
   }, [router]);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 768px)");
+    setIsDesktop(mq.matches);
+    const onChange = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
 
   function handleLogout() {
     localStorage.removeItem("token");
@@ -58,10 +71,12 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
 
   const activeLabel = navItems.find(n => isActive(n.href))?.label ?? "";
 
-  return (
-    <>
-      {/* ── Mobile layout — visible on <md ─────────────────────────────── */}
-      <div className="flex flex-col md:hidden" style={{ minHeight: "100dvh", background: SAGE }}>
+  // Breakpoint not yet known on first paint — render nothing rather than guess wrong.
+  if (isDesktop === null) return null;
+
+  if (!isDesktop) {
+    return (
+      <div className="flex flex-col" style={{ minHeight: "100dvh", background: SAGE }}>
         {/* White content card */}
         <div style={{ flex: 1, background: CARD, display: "flex", flexDirection: "column", overflow: "hidden" }}>
           {/* Topbar */}
@@ -101,9 +116,11 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
           })}
         </nav>
       </div>
+    );
+  }
 
-      {/* ── Desktop layout — visible on md+ ────────────────────────────── */}
-      <div className="hidden md:flex flex-1 min-h-screen p-4" style={{ background: "#F2EBE1" }}>
+  return (
+    <div className="flex flex-1 min-h-screen p-4" style={{ background: "#F2EBE1" }}>
         <div className="flex flex-1 overflow-hidden" style={{ background: SAGE, borderRadius: 28, border: "1px solid rgba(0,0,0,0.08)", boxShadow: "0 20px 60px rgba(42,39,32,0.14), 0 4px 14px rgba(42,39,32,0.06)" }}>
           {/* Sidebar */}
           <aside style={{ width: 182, flexShrink: 0, background: SAGE, display: "flex", flexDirection: "column", padding: "32px 0 24px", position: "relative", zIndex: 2 }}>
@@ -178,10 +195,8 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </div>
-    </>
   );
 }
-
 // ── Exported layout — provides language context ───────────────────────────
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (

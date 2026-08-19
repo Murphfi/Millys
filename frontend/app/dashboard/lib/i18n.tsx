@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
 export type Lang = "es" | "en" | "ca";
 
@@ -9,9 +9,10 @@ const LANG_STORAGE_KEY = "millys_lang";
 export const TRANSLATIONS = {
   es: {
     nav: { home: "Home", global: "Global", expenses: "Gastos", config: "Config" },
+    home: { recent: "Últimos gastos", seeAll: "Ver todos", projection: "Proyección a fin de mes", viewAllExpenses: "Ver todos los gastos" },
     expenses: {
       viewDay: "Día", viewWeek: "Semana", viewMonth: "Mes", viewCalendar: "Calendario",
-      empty: "Sin gastos", today: "Hoy", total: "Total gastos", categoryTitle: "Gastos por categoría",
+      empty: "Sin gastos", loading: "Cargando...", today: "Hoy", total: "Total gastos", categoryTitle: "Gastos por categoría", clearFilter: "Ver todas",
       weekDays: ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"],
     },
     expense: {
@@ -36,10 +37,16 @@ export const TRANSLATIONS = {
       cancel: "Cancelar",
       colorApply: "Aplicar",
       languageTitle: "Idioma",
+      noDescription: "No necesita descripción",
     },
     calendar: {
       months: ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"],
       days: ["Lu","Ma","Mi","Ju","Vi","Sa","Do"],
+    },
+    errors: {
+      add: "No se ha podido añadir el gasto. Inténtalo de nuevo.",
+      update: "No se ha podido guardar el cambio. Se ha revertido.",
+      delete: "No se ha podido eliminar el gasto. Se ha restaurado.",
     },
     languages: { es: "Español", en: "English", ca: "Català" },
     categories: {
@@ -55,9 +62,10 @@ export const TRANSLATIONS = {
   },
   en: {
     nav: { home: "Home", global: "Global", expenses: "Expenses", config: "Config" },
+    home: { recent: "Recent expenses", seeAll: "See all", projection: "Projected by month's end", viewAllExpenses: "View all expenses" },
     expenses: {
       viewDay: "Day", viewWeek: "Week", viewMonth: "Month", viewCalendar: "Calendar",
-      empty: "No expenses", today: "Today", total: "Total expenses", categoryTitle: "Spending by category",
+      empty: "No expenses", loading: "Loading...", today: "Today", total: "Total expenses", categoryTitle: "Spending by category", clearFilter: "Show all",
       weekDays: ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"],
     },
     expense: {
@@ -82,10 +90,16 @@ export const TRANSLATIONS = {
       cancel: "Cancel",
       colorApply: "Apply",
       languageTitle: "Language",
+      noDescription: "No description needed",
     },
     calendar: {
       months: ["January","February","March","April","May","June","July","August","September","October","November","December"],
       days: ["Mo","Tu","We","Th","Fr","Sa","Su"],
+    },
+    errors: {
+      add: "Couldn't add the expense. Please try again.",
+      update: "Couldn't save the change. It's been reverted.",
+      delete: "Couldn't delete the expense. It's been restored.",
     },
     languages: { es: "Español", en: "English", ca: "Català" },
     categories: {
@@ -101,9 +115,10 @@ export const TRANSLATIONS = {
   },
   ca: {
     nav: { home: "Inici", global: "Global", expenses: "Despeses", config: "Config" },
+    home: { recent: "Últimes despeses", seeAll: "Veure-les totes", projection: "Projecció a final de mes", viewAllExpenses: "Veure totes les despeses" },
     expenses: {
       viewDay: "Dia", viewWeek: "Setmana", viewMonth: "Mes", viewCalendar: "Calendari",
-      empty: "Sense despeses", today: "Avui", total: "Total despeses", categoryTitle: "Despeses per categoria",
+      empty: "Sense despeses", loading: "Carregant...", today: "Avui", total: "Total despeses", categoryTitle: "Despeses per categoria", clearFilter: "Veure-les totes",
       weekDays: ["Dilluns","Dimarts","Dimecres","Dijous","Divendres","Dissabte","Diumenge"],
     },
     expense: {
@@ -128,10 +143,16 @@ export const TRANSLATIONS = {
       cancel: "Cancel·la",
       colorApply: "Aplica",
       languageTitle: "Idioma",
+      noDescription: "No necessita descripció",
     },
     calendar: {
       months: ["Gener","Febrer","Març","Abril","Maig","Juny","Juliol","Agost","Setembre","Octubre","Novembre","Desembre"],
       days: ["Dl","Dt","Dc","Dj","Dv","Ds","Dg"],
+    },
+    errors: {
+      add: "No s'ha pogut afegir la despesa. Torna-ho a provar.",
+      update: "No s'ha pogut desar el canvi. S'ha revertit.",
+      delete: "No s'ha pogut eliminar la despesa. S'ha restaurat.",
     },
     languages: { es: "Español", en: "English", ca: "Català" },
     categories: {
@@ -163,13 +184,18 @@ export function LangProvider({ children }: { children: React.ReactNode }) {
     if (stored && stored in TRANSLATIONS) setLangState(stored);
   }, []);
 
-  function setLang(l: Lang) {
+  const setLang = useCallback((l: Lang) => {
     setLangState(l);
     localStorage.setItem(LANG_STORAGE_KEY, l);
-  }
+  }, []);
+
+  const value = useMemo(
+    () => ({ lang, setLang, t: TRANSLATIONS[lang] as T }),
+    [lang, setLang]
+  );
 
   return (
-    <LangContext.Provider value={{ lang, setLang, t: TRANSLATIONS[lang] as T }}>
+    <LangContext.Provider value={value}>
       {children}
     </LangContext.Provider>
   );

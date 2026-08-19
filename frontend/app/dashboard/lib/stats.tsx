@@ -1,0 +1,169 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import type { Expense } from "./expenses";
+import type { Category } from "./categories";
+import { getCategoryLabel, useLang } from "./i18n";
+
+// Shared month-aggregation logic + the category-bars chart used by both the
+// Gastos sidebar summary and the Home hero block — kept here so the two stay
+// in sync instead of drifting apart as separately-maintained copies.
+
+export function parseExpenseDate(iso: string): Date {
+  return new Date(iso + "T12:00:00");
+}
+
+function inMonth(e: Expense, month: number, year: number): boolean {
+  const d = parseExpenseDate(e.date);
+  return d.getMonth() === month && d.getFullYear() === year;
+}
+
+export function todayDate(): Date {
+  const d = new Date();
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+export function isSameDay(a: Date, b: Date): boolean {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
+export function toDateKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** Monday-first 5-6 week grid for a given month, trimmed to 5 rows when the 6th is unused. */
+export function getMonthGrid(year: number, month: number): Date[] {
+  const first = new Date(year, month, 1);
+  const dow = first.getDay();
+  const start = new Date(year, month, 1 + (dow === 0 ? -6 : 1 - dow));
+  const grid = Array.from({ length: 42 }, (_, i) =>
+    new Date(start.getFullYear(), start.getMonth(), start.getDate() + i),
+  );
+  return grid[35].getMonth() !== month ? grid.slice(0, 35) : grid;
+}
+
+export function getMonthTotal(expenses: Expense[], month: number, year: number): number {
+  return expenses.filter(e => inMonth(e, month, year)).reduce((s, e) => s + e.amount, 0);
+}
+
+export function getPrevMonth(month: number, year: number): { month: number; year: number } {
+  return month === 0 ? { month: 11, year: year - 1 } : { month: month - 1, year };
+}
+
+/** Percent change vs. the previous month, or null when there's nothing to compare against. */
+export function getMonthComparisonPct(expenses: Expense[], month: number, year: number): number | null {
+  const { month: pm, year: py } = getPrevMonth(month, year);
+  const prevTotal = getMonthTotal(expenses, pm, py);
+  if (prevTotal <= 0) return null;
+  const total = getMonthTotal(expenses, month, year);
+  return ((total - prevTotal) / prevTotal) * 100;
+}
+
+export function getUserTotals(expenses: Expense[], month: number, year: number): [string, number][] {
+  const map: Record<string, number> = {};
+  expenses.filter(e => inMonth(e, month, year)).forEach(e => { map[e.userName] = (map[e.userName] ?? 0) + e.amount; });
+  return Object.entries(map).sort((a, b) => b[1] - a[1]);
+}
+
+export type CategoryEntry = { id: string; color: string; label: string; amount: number };
+
+export function getCategoryTotals(
+  expenses: Expense[],
+  month: number,
+  year: number,
+  getCat: (id: string) => Category | undefined,
+  t: ReturnType<typeof useLang>["t"],
+  fallbackColor: string,
+): CategoryEntry[] {
+  const map: Record<string, CategoryEntry> = {};
+  expenses.filter(e => inMonth(e, month, year)).forEach(e => {
+    const cat = getCat(e.categoryId);
+    map[e.categoryId] ??= {
+      id: e.categoryId,
+      color: cat?.color ?? fallbackColor,
+      label: cat ? getCategoryLabel(cat, t) : e.categoryId,
+      amount: 0,
+    };
+    map[e.categoryId].amount += e.amount;
+  });
+  return Object.values(map).sort((a, b) => b.amount - a.amount);
+}
+
+function fmtCurrency(n: number): string {
+  return n.toLocaleString("es-ES", { minimumFractionDigits: 2 }) + " €";
+}
+
+const CHARCOAL = "#2A2720";
+const STONE    = "#78726A";
+const MUTED    = "#A09890";
+
+/**
+ * Horizontal bar-per-category breakdown, sorted by spend descending with the
+ * amount labeled on every bar (accessibility rule: never rely on bar length
+ * alone). Clicking a bar toggles it as the active filter via `onSelect`.
+ */
+export function CategoryBars({ expenses, month, year, getCat, selected, onSelect }: {
+  expenses: Expense[];
+  month: number;
+  year: number;
+  getCat: (id: string) => Category | undefined;
+  selected?: string | null;
+  onSelect?: (id: string | null) => void;
+}) {
+  const { t } = useLang();
+  const [animated, setAnimated] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setAnimated(true), 50);
+    return () => { clearTimeout(timer); setAnimated(false); };
+  }, [month]);
+
+  const entries = useMemo(
+    () => getCategoryTotals(expenses, month, year, getCat, t, MUTED),
+    [expenses, month, year, getCat, t],
+  );
+
+  if (entries.length === 0) return null;
+
+  const maxAmt = entries[0].amount;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      {entries.map(({ id, color, label, amount }, i) => {
+        const isSelected = selected === id;
+        const dimmed = selected != null && !isSelected;
+        return (
+          <button
+            key={id}
+            onClick={() => onSelect?.(isSelected ? null : id)}
+            style={{
+              display: "block", width: "100%", background: "transparent", border: "none",
+              padding: "4px 2px", cursor: onSelect ? "pointer" : "default", textAlign: "left",
+              opacity: dimmed ? 0.4 : 1, transition: "opacity 0.15s ease",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 4 }}>
+              <span style={{ width: 5, height: 5, borderRadius: "50%", background: color, flexShrink: 0, display: "inline-block" }} />
+              <span style={{ fontSize: "0.595rem", fontWeight: isSelected ? 700 : 500, color: isSelected ? CHARCOAL : STONE, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
+                {label}
+              </span>
+              <span style={{ fontSize: "0.595rem", color: CHARCOAL, fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>
+                {fmtCurrency(amount)}
+              </span>
+            </div>
+            <div style={{ height: 5, background: "#EDE8DF", borderRadius: 999, overflow: "hidden" }}>
+              <div style={{
+                height: "100%",
+                width: animated ? `${(amount / maxAmt) * 100}%` : "0%",
+                background: color,
+                borderRadius: 999,
+                transition: "width 0.55s cubic-bezier(0.34, 1.56, 0.64, 1)",
+                transitionDelay: `${i * 60}ms`,
+              }} />
+            </div>
+          </button>
+        );
+      })}
+    </div>
+  );
+}

@@ -57,6 +57,15 @@ cd frontend && npm run dev
 - [ ] Expense management (CRUD)
 - [ ] Charts (Recharts)
 
+## Memory System
+
+El vault de memoria está en `~/Omurphy-brain/Projects/Millys/`.
+
+- **`/wake`** — Al empezar a trabajar: lee `Progress.md` y `Decisions.md` y da un briefing del estado actual
+- **`/wrap`** — Al terminar: actualiza `Progress.md` con lo hecho y escribe una entrada en `~/Omurphy-brain/Memory.md`
+
+Las skills de diseño y UI están en `~/code/.claude/skills/` y disponibles globalmente.
+
 ## Rules
 
 - No Docker locally

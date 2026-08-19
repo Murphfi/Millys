@@ -2,20 +2,22 @@
 
 import { useEffect, useState } from "react";
 import { Pencil, Trash2, Plus, Check, X } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useCategories, COLOR_PALETTE, type Category } from "../lib/categories";
 import { useLang, getCategoryLabel, type Lang } from "../lib/i18n";
+import { apiFetch } from "../lib/expenses";
 
 const STONE    = "#78726A";
 const MUTED    = "#A09890";
 const CHARCOAL = "#2A2720";
 const BORDER   = "#EDE8DF";
-const BACKEND  = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
 type SettingsT = {
   categoryNamePlaceholder: string;
   color: string;
   save: string;
   cancel: string;
+  noDescription: string;
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────
@@ -143,12 +145,13 @@ function EditRow({
   cat, onSave, onCancel, ts,
 }: {
   cat: Partial<Category>;
-  onSave: (label: string, color: string) => void;
+  onSave: (label: string, color: string, noDescription: boolean) => void;
   onCancel: () => void;
   ts: SettingsT;
 }) {
   const [label, setLabel] = useState(cat.label ?? "");
   const [color, setColor] = useState(cat.color ?? COLOR_PALETTE[0]);
+  const [noDescription, setNoDescription] = useState(cat.noDescription ?? false);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14, padding: "16px 20px", background: "#F7F5F2", border: `1px solid ${BORDER}`, borderRadius: 12 }}>
@@ -160,7 +163,7 @@ function EditRow({
         placeholder={ts.categoryNamePlaceholder}
         style={{ border: "none", borderBottom: "1.5px solid #A78BFA", background: "transparent", color: CHARCOAL, fontSize: "0.875rem", outline: "none", padding: "0 0 6px", width: "100%" }}
         onKeyDown={(e) => {
-          if (e.key === "Enter" && label.trim()) onSave(label.trim(), color);
+          if (e.key === "Enter" && label.trim()) onSave(label.trim(), color, noDescription);
           if (e.key === "Escape") onCancel();
         }}
       />
@@ -173,9 +176,15 @@ function EditRow({
         <ColorControls value={color} onChange={setColor} />
       </div>
 
+      {/* No description needed */}
+      <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: "0.8rem", color: CHARCOAL }}>
+        <Checkbox checked={noDescription} onCheckedChange={(c) => setNoDescription(c === true)} />
+        {ts.noDescription}
+      </label>
+
       {/* Actions */}
       <div style={{ display: "flex", gap: 8 }}>
-        <button type="button" onClick={() => { if (label.trim()) onSave(label.trim(), color); }} disabled={!label.trim()}
+        <button type="button" onClick={() => { if (label.trim()) onSave(label.trim(), color, noDescription); }} disabled={!label.trim()}
           style={{ display: "flex", alignItems: "center", gap: 5, padding: "7px 16px", borderRadius: 999, border: "none", background: CHARCOAL, color: "#FAF9F7", fontSize: "0.8rem", fontWeight: 600, cursor: label.trim() ? "pointer" : "not-allowed", opacity: label.trim() ? 1 : 0.4 }}
         >
           <Check size={12} strokeWidth={2.5} />
@@ -199,10 +208,11 @@ type ApiCategory = {
   label: string;
   color: string;
   default: boolean;
+  noDescription: boolean;
 };
 
 function apiToCategory(c: ApiCategory): Category {
-  return { id: c.code, label: c.label, color: c.color, dbId: c.id };
+  return { id: c.code, label: c.label, color: c.color, dbId: c.id, noDescription: c.noDescription };
 }
 
 // ── Main settings page ────────────────────────────────────────────────────
@@ -219,48 +229,47 @@ export default function SettingsPage() {
   const [adding, setAdding]         = useState(false);
 
   useEffect(() => {
-    fetch(`${BACKEND}/api/categories`)
+    apiFetch("/api/categories")
       .then(r => r.ok ? r.json() : Promise.reject())
-      .then((data: ApiCategory[]) => setCategories(data.map(apiToCategory)))
+      .then((data: ApiCategory[]) => { if (data.length > 0) setCategories(data.map(apiToCategory)); })
       .catch(() => {});
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function handleSaveEdit(id: string, label: string, color: string) {
+  async function handleSaveEdit(id: string, label: string, color: string, noDescription: boolean) {
     const cat = categories.find(c => c.id === id);
     if (cat?.dbId) {
-      await fetch(`${BACKEND}/api/categories/${cat.dbId}`, {
+      await apiFetch(`/api/categories/${cat.dbId}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: id, label, color }),
+        body: JSON.stringify({ code: id, label, color, noDescription }),
       }).catch(() => {});
     }
-    setCategories(prev => prev.map(c => c.id === id ? { ...c, label, color } : c));
+    setCategories(prev => prev.map(c => c.id === id ? { ...c, label, color, noDescription } : c));
     setEditingId(null);
   }
 
-  async function handleAdd(label: string, color: string) {
+  async function handleAdd(label: string, color: string, noDescription: boolean) {
     const code = label.toLowerCase().replace(/\s+/g, "_") + "_" + Date.now();
     let dbId: number | undefined;
     try {
-      const res = await fetch(`${BACKEND}/api/categories`, {
+      const res = await apiFetch("/api/categories", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code, label, color }),
+        body: JSON.stringify({ code, label, color, noDescription }),
       });
       if (res.ok) {
         const created: ApiCategory = await res.json();
         dbId = created.id;
       }
     } catch {}
-    setCategories(prev => [...prev, { id: code, label, color, dbId }]);
+    setCategories(prev => [...prev, { id: code, label, color, dbId, noDescription }]);
     setAdding(false);
   }
 
   async function handleDelete(id: string) {
     const cat = categories.find(c => c.id === id);
     if (cat?.dbId) {
-      await fetch(`${BACKEND}/api/categories/${cat.dbId}`, {
+      await apiFetch(`/api/categories/${cat.dbId}`, {
         method: "DELETE",
+        headers: { "Content-Type": "" },
       }).catch(() => {});
     }
     setCategories(prev => prev.filter(c => c.id !== id));
@@ -299,7 +308,7 @@ export default function SettingsPage() {
               {editingId === cat.id ? (
                 <EditRow
                   cat={cat}
-                  onSave={(label, color) => handleSaveEdit(cat.id, label, color)}
+                  onSave={(label, color, noDescription) => handleSaveEdit(cat.id, label, color, noDescription)}
                   onCancel={() => setEditingId(null)}
                   ts={t.settings}
                 />

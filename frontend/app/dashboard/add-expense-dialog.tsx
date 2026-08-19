@@ -241,7 +241,7 @@ function ExpenseForm({
 
   const isEdit      = !!initialValues;
   const selectedCat = categories.find(c => c.id === categoryId);
-  const isChofa     = categoryId === "chofa";
+  const isChofa     = selectedCat?.noDescription ?? false;
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -310,7 +310,10 @@ function ExpenseForm({
         <Label className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: MUTED }}>
           {t.expense.category}
         </Label>
-        <Select value={categoryId} onValueChange={(v) => { setCategoryId(v ?? ""); if (v === "chofa") setDescription(""); }}>
+        <Select value={categoryId} onValueChange={(v) => {
+          setCategoryId(v ?? "");
+          if (categories.find(c => c.id === v)?.noDescription) setDescription("");
+        }}>
           <SelectTrigger
             className="w-full rounded-none border-x-0 border-t-0 border-b bg-transparent px-0 pb-2 focus-visible:ring-0 millys-input"
             style={{ color: CHARCOAL }}
@@ -337,7 +340,7 @@ function ExpenseForm({
         </Select>
       </div>
 
-      {/* Description — hidden for Chofa (no description needed) */}
+      {/* Description — hidden for categories marked noDescription (e.g. Chofa) */}
       {!isChofa && (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <Label className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: MUTED }}>
