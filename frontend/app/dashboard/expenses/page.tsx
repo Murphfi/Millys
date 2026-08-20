@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState, useMemo, useCallback, Suspense } from "react";
+import { createPortal } from "react-dom";
 import { useSearchParams } from "next/navigation";
 import { Pencil, Trash2, ChevronLeft, ChevronRight, X, TrendingUp, TrendingDown } from "lucide-react";
 import { useLang, getCategoryLabel } from "../lib/i18n";
 import { useCategories, type Category } from "../lib/categories";
 import { useExpenses, type Expense } from "../lib/expenses";
 import { ExpenseDialog } from "../add-expense-dialog";
+import { useTopBarSlot } from "../lib/topbar-slot";
 import {
   CategoryBars, getMonthTotal, getMonthComparisonPct, getUserTotals, getPrevMonth,
   getMonthGrid, toDateKey, todayDate as today, isSameDay as sameDay,
@@ -254,10 +256,11 @@ function ViewTabs({ active, onChange }: { active: ViewMode; onChange: (v: ViewMo
 // Active: Fraunces italic. Adjacent ±1: intermediate weight/size.
 // Hover: spring scale. Edges: gradient fade revealing depth.
 
-function MonthStrip({ selectedDate, setSelectedDate, expenses }: {
+function MonthStrip({ selectedDate, setSelectedDate, expenses, bordered = true }: {
   selectedDate: Date;
   setSelectedDate: (d: Date) => void;
   expenses: Expense[];
+  bordered?: boolean;
 }) {
   const { t } = useLang();
   const scrollRef  = useRef<HTMLDivElement>(null);
@@ -305,7 +308,7 @@ function MonthStrip({ selectedDate, setSelectedDate, expenses }: {
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", borderBottom: `1px solid ${BORDER}`, flexShrink: 0 }}>
+    <div style={{ display: "flex", flexDirection: "column", borderBottom: bordered ? `1px solid ${BORDER}` : "none", flexShrink: 0 }}>
       {/* Year strip — centered */}
       <div
         className="millys-scroll-hidden"
@@ -790,6 +793,7 @@ function ExpensesPageInner() {
   const { expenses, ready, syncError, dismissSyncError } = useExpenses();
   const { t }              = useLang();
   const searchParams       = useSearchParams();
+  const topBarSlot         = useTopBarSlot();
   const now = new Date();
 
   useEffect(() => {
@@ -904,8 +908,15 @@ function ExpensesPageInner() {
     <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
       {syncError && <SyncErrorBanner message={t.errors[syncError]} onDismiss={dismissSyncError} />}
 
-      {/* Month + year scroll strip */}
-      <MonthStrip selectedDate={selectedDate} setSelectedDate={updateDate} expenses={expenses} />
+      {/* Month + year scroll strip — portaled into the shell's topbar row on
+          desktop (reuses that space instead of stacking a second header row);
+          falls back to rendering inline here on mobile / before the slot mounts. */}
+      {topBarSlot
+        ? createPortal(
+            <MonthStrip selectedDate={selectedDate} setSelectedDate={updateDate} expenses={expenses} bordered={false} />,
+            topBarSlot,
+          )
+        : <MonthStrip selectedDate={selectedDate} setSelectedDate={updateDate} expenses={expenses} />}
 
       {/* Body */}
       <div className="flex-col md:flex-row millys-mobile-body" style={{ flex: 1, overflow: "hidden", display: "flex" }}>

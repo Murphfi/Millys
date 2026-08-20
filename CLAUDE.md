@@ -43,26 +43,36 @@ cd backend && export $(grep -v '^#' .env | xargs) && ./mvnw spring-boot:run
 cd frontend && npm run dev
 ```
 
-## V1 Scope
+Shortcuts (skills in `.claude/skills/`):
+- **`/dev-up`** — starts backend + frontend in background, waits until both respond
+- **`/dev-down`** — stops both by killing whatever's listening on 8080/3000
+
+## V1 — first deploy
+
+Millys will grow into more than one tool over time. V1 is just the first of those to ship: the expense tracker, live end-to-end at `millys.es`. It's a starting point, not a feature cap — new ideas showing up along the way (like Settings/categories or i18n) are expected and fine to build.
 
 1. Login for 3 users: Murphfas, Lilly, Test
 2. Monthly expense management
 3. Charts and visualisation
+4. Deployed and reachable at `millys.es`
 
 ### Current state
 
 - [x] JWT authentication (backend)
 - [x] Login page — two-panel card, cat room SVG illustration, underline form, shadcn inputs
 - [x] Dashboard shell — sidebar, bocadillo connected-tab nav, subpantalla, topbar
-- [ ] Expense management (CRUD)
+- [x] Expense management (CRUD)
 - [ ] Charts (Recharts)
+- [ ] Deploy to `millys.es` (Vercel + Render, DNS)
 
 ## Memory System
 
 El vault de memoria está en `~/Omurphy-brain/Projects/Millys/`.
 
 - **`/wake`** — Al empezar a trabajar: lee `Progress.md` y `Decisions.md` y da un briefing del estado actual
-- **`/wrap`** — Al terminar: actualiza `Progress.md` con lo hecho y escribe una entrada en `~/Omurphy-brain/Memory.md`
+- **`/wrap`** — Al terminar: actualiza `Progress.md` con lo hecho y escribe una entrada en `~/Omurphy-brain/Memory.md`; invoca `/dev-down` antes de cerrar
+- **`/dev-up`** — Al empezar a programar: levanta backend + frontend en segundo plano
+- **`/dev-down`** — Al terminar: para ambos servidores
 
 Las skills de diseño y UI están en `~/code/.claude/skills/` y disponibles globalmente.
 
@@ -70,7 +80,7 @@ Las skills de diseño y UI están en `~/code/.claude/skills/` y disponibles glob
 
 - No Docker locally
 - This is a learning project: explain before implementing
-- No features outside V1 scope
+- Finish V1 (charts, deploy to `millys.es`) before starting a new tool/idea for the domain
 - Branch `develop` for daily work, `main` for releases
 - Never commit without explicit user approval
 

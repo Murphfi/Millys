@@ -3,10 +3,13 @@
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
-import { Home, BarChart3, Receipt, LogOut, Settings } from "lucide-react";
+import { Home, BarChart3, Receipt, LogOut, Settings, PiggyBank } from "lucide-react";
 import { AddExpenseButton } from "./add-expense-dialog";
 import { LangProvider, useLang } from "./lib/i18n";
 import { ExpensesProvider } from "./lib/expenses";
+import { IncomeProvider } from "./lib/income";
+import { SavingsProvider } from "./lib/savings";
+import { TopBarSlotContext } from "./lib/topbar-slot";
 
 const SAGE     = "#5E7C64";
 const CARD     = "#FAF9F7";
@@ -19,6 +22,7 @@ const NAV_OFF  = "#9AB89D";
 const NAV_ROUTES = [
   { key: "home"     as const, href: "/dashboard/home",     icon: Home },
   { key: "expenses" as const, href: "/dashboard/expenses", icon: Receipt },
+  { key: "ahorro"   as const, href: "/dashboard/ahorro",   icon: PiggyBank },
   { key: "global"   as const, href: "/dashboard/global",   icon: BarChart3 },
   { key: "config"   as const, href: "/dashboard/settings", icon: Settings },
 ];
@@ -41,6 +45,8 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   // rendering both and hiding one with CSS let Radix dialog portals (which escape to
   // document.body) stay open-but-invisible across a breakpoint-crossing resize.
   const [isDesktop, setIsDesktop] = useState<boolean | null>(null);
+  // Desktop topbar portal target — see lib/topbar-slot.tsx
+  const [topBarSlot, setTopBarSlot] = useState<HTMLDivElement | null>(null);
 
   // Build translated nav items on each render
   const navItems = NAV_ROUTES.map(r => ({ ...r, label: t.nav[r.key] }));
@@ -68,8 +74,6 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   function isActive(href: string) {
     return pathname.startsWith(href);
   }
-
-  const activeLabel = navItems.find(n => isActive(n.href))?.label ?? "";
 
   // Breakpoint not yet known on first paint — render nothing rather than guess wrong.
   if (isDesktop === null) return null;
@@ -175,12 +179,17 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
           {/* Content area */}
           <div style={{ flex: 1, minWidth: 0, position: "relative", zIndex: 1 }}>
             <div style={{ position: "absolute", top: 16, left: 20, right: 12, bottom: 12, background: CARD, borderRadius: 20, boxShadow: "0 8px 40px rgba(42,39,32,0.12), 0 2px 8px rgba(42,39,32,0.05)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
-              {/* Topbar */}
-              <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 24px", height: 52, borderBottom: "1px solid #EDE8DF", flexShrink: 0 }}>
-                <span style={{ fontFamily: "var(--font-display), serif", fontStyle: "italic", fontWeight: 300, fontSize: "0.95rem", letterSpacing: "-0.01em", fontVariationSettings: '"SOFT" 100, "WONK" 1', color: STONE }}>
-                  {activeLabel}
-                </span>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {/* Top-right controls — no label, no border. The active page is already
+                  shown by the sidebar tab, so repeating its name here was redundant.
+                  The left side is a portal slot: pages with their own top-of-page
+                  controls (e.g. Gastos' month strip) render into it instead of
+                  stacking a second header row below — same space, reused. Fixed
+                  height (not min-height) so the row is identical on every page —
+                  a height that only grew for Gastos made the button/avatar jump
+                  up and down when switching pages. */}
+              <header style={{ display: "flex", alignItems: "center", gap: 16, padding: "0 24px", height: 84, flexShrink: 0 }}>
+                <div ref={setTopBarSlot} style={{ flex: 1, minWidth: 0 }} />
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
                   <AddExpenseButton />
                   <div style={{ width: 26, height: 26, borderRadius: "50%", background: "#EDE8DF", border: "1px solid #DDD7CC", display: "flex", alignItems: "center", justifyContent: "center", color: STONE, fontSize: 10, fontWeight: 700, flexShrink: 0 }}>
                     {username ? username[0].toUpperCase() : "·"}
@@ -190,7 +199,9 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
               </header>
 
               {/* Page content */}
-              <main style={{ flex: 1, overflow: "auto" }}>{children}</main>
+              <TopBarSlotContext.Provider value={topBarSlot}>
+                <main style={{ flex: 1, overflow: "auto" }}>{children}</main>
+              </TopBarSlotContext.Provider>
             </div>
           </div>
         </div>
@@ -202,7 +213,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <LangProvider>
       <ExpensesProvider>
-        <DashboardContent>{children}</DashboardContent>
+        <IncomeProvider>
+          <SavingsProvider>
+            <DashboardContent>{children}</DashboardContent>
+          </SavingsProvider>
+        </IncomeProvider>
       </ExpensesProvider>
     </LangProvider>
   );

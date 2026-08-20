@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -17,6 +17,8 @@ import {
 import { useCategories } from "./lib/categories";
 import { useLang, getCategoryLabel } from "./lib/i18n";
 import { useExpenses, getCurrentUsername, type Expense } from "./lib/expenses";
+import { useIncome, type Income } from "./lib/income";
+import { DatePicker } from "./date-picker";
 
 // ── Design tokens ─────────────────────────────────────────────────────────
 const CHARCOAL = "#2A2720";
@@ -38,169 +40,6 @@ function CategoryDot({ color }: { color: string }) {
       background: color,
       flexShrink: 0,
     }} />
-  );
-}
-
-// ── Custom date picker ────────────────────────────────────────────────────
-function DatePicker({
-  value, onChange,
-  months, days, placeholder,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  months: readonly string[];
-  days: readonly string[];
-  placeholder: string;
-}) {
-  const [open, setOpen] = useState(false);
-
-  const selectedDate = value ? new Date(value + "T12:00:00") : null;
-  const [viewYear,  setViewYear]  = useState(() => selectedDate?.getFullYear()  ?? new Date().getFullYear());
-  const [viewMonth, setViewMonth] = useState(() => selectedDate?.getMonth()     ?? new Date().getMonth());
-
-  const displayValue = selectedDate
-    ? `${String(selectedDate.getDate()).padStart(2,"0")}/${String(selectedDate.getMonth()+1).padStart(2,"0")}/${selectedDate.getFullYear()}`
-    : "";
-
-  function prevMonth() {
-    if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); }
-    else setViewMonth(m => m - 1);
-  }
-  function nextMonth() {
-    if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1); }
-    else setViewMonth(m => m + 1);
-  }
-  function selectDay(day: number) {
-    const d  = new Date(viewYear, viewMonth, day);
-    const yy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, "0");
-    const dd = String(d.getDate()).padStart(2, "0");
-    onChange(`${yy}-${mm}-${dd}`);
-    setOpen(false);
-  }
-
-  // Monday-first grid
-  const startOffset = (new Date(viewYear, viewMonth, 1).getDay() + 6) % 7;
-  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
-  const cells: (number | null)[] = [
-    ...Array(startOffset).fill(null),
-    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
-  ];
-  const today = new Date();
-
-  return (
-    <div style={{ position: "relative" }}>
-      {/* Trigger — same underline style as other fields */}
-      <button
-        type="button"
-        onClick={() => setOpen(o => !o)}
-        className="millys-input"
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          width: "100%",
-          border: "none",
-          borderBottom: `1px solid ${BORDER}`,
-          background: "transparent",
-          padding: "0 0 8px",
-          color: displayValue ? CHARCOAL : MUTED,
-          fontSize: "0.875rem",
-          cursor: "pointer",
-          outline: "none",
-          fontFamily: "var(--font-sans)",
-        }}
-      >
-        <span>{displayValue || placeholder}</span>
-        <Calendar size={14} color={MUTED} />
-      </button>
-
-      {open && (
-        <>
-          {/* Backdrop */}
-          <div style={{ position: "fixed", inset: 0, zIndex: 49 }} onClick={() => setOpen(false)} />
-
-          {/* Calendar card */}
-          <div style={{
-            position: "absolute",
-            top: "calc(100% + 8px)",
-            left: 0,
-            zIndex: 50,
-            background: CARD,
-            border: "1px solid #EDE8DF",
-            borderRadius: 16,
-            padding: "16px 14px 14px",
-            boxShadow: "0 16px 48px rgba(42,39,32,0.16), 0 4px 16px rgba(42,39,32,0.06)",
-            minWidth: 252,
-          }}>
-            {/* Month / year navigation */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-              <button type="button" onClick={prevMonth} style={{ background: "transparent", border: "none", cursor: "pointer", padding: "4px 6px", borderRadius: 8, color: MUTED, display: "flex" }}>
-                <ChevronLeft size={16} />
-              </button>
-              <span style={{
-                fontFamily: "var(--font-display), serif",
-                fontStyle: "italic",
-                fontWeight: 300,
-                fontSize: "1rem",
-                letterSpacing: "-0.01em",
-                fontVariationSettings: '"SOFT" 100, "WONK" 1',
-                color: CHARCOAL,
-              }}>
-                {months[viewMonth]} {viewYear}
-              </span>
-              <button type="button" onClick={nextMonth} style={{ background: "transparent", border: "none", cursor: "pointer", padding: "4px 6px", borderRadius: 8, color: MUTED, display: "flex" }}>
-                <ChevronRight size={16} />
-              </button>
-            </div>
-
-            {/* Week day headers */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", marginBottom: 4 }}>
-              {days.map(d => (
-                <span key={d} style={{ textAlign: "center", fontSize: 10, fontWeight: 700, letterSpacing: "0.04em", color: MUTED, paddingBottom: 4 }}>
-                  {d}
-                </span>
-              ))}
-            </div>
-
-            {/* Day cells */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2 }}>
-              {cells.map((day, i) => {
-                if (!day) return <span key={i} />;
-                const isSelected = !!(selectedDate &&
-                  day === selectedDate.getDate() &&
-                  viewMonth === selectedDate.getMonth() &&
-                  viewYear === selectedDate.getFullYear());
-                const isToday = day === today.getDate() && viewMonth === today.getMonth() && viewYear === today.getFullYear();
-                return (
-                  <button
-                    key={i}
-                    type="button"
-                    onClick={() => selectDay(day)}
-                    style={{
-                      width: "100%",
-                      aspectRatio: "1",
-                      borderRadius: "50%",
-                      border: isToday && !isSelected ? `1px solid ${SAGE}` : "none",
-                      background: isSelected ? SAGE : "transparent",
-                      color: isSelected ? CARD : CHARCOAL,
-                      fontSize: 12,
-                      fontWeight: isSelected ? 600 : 400,
-                      cursor: "pointer",
-                      transition: "background 0.1s ease",
-                    }}
-                    onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.background = "#EDE8DF"; }}
-                    onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.background = "transparent"; }}
-                  >
-                    {day}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </>
-      )}
-    </div>
   );
 }
 
@@ -435,6 +274,227 @@ function ExpenseForm({
   );
 }
 
+// ── Income form ───────────────────────────────────────────────────────────
+type IncomeData = Omit<Income, "id">;
+
+function IncomeForm({
+  onClose,
+  initialValues,
+  onSubmit,
+}: {
+  onClose: () => void;
+  initialValues?: Pick<Income, "description" | "date" | "amount" | "userName">;
+  onSubmit: (data: IncomeData) => void;
+}) {
+  const { t }                         = useLang();
+  const currentUser                   = getCurrentUsername();
+  const isTest                        = currentUser.toLowerCase() === "test";
+  const [amount, setAmount]           = useState(initialValues?.amount?.toString() ?? "");
+  const [description, setDescription] = useState(initialValues?.description ?? "");
+  const [date, setDate]               = useState(initialValues?.date ?? new Date().toISOString().slice(0, 10));
+  const [userName, setUserName]       = useState(initialValues?.userName ?? currentUser);
+  const [users, setUsers]             = useState<string[]>([]);
+
+  // Fetch real user list for non-Test sessions
+  useEffect(() => {
+    if (isTest) return;
+    const token = localStorage.getItem("token") ?? sessionStorage.getItem("token") ?? "";
+    fetch(`${API_URL}/api/users`, { headers: { "Authorization": `Bearer ${token}` } })
+      .then(r => r.json())
+      .then((data: string[]) => setUsers(data.filter(u => u.toLowerCase() !== "test")))
+      .catch(() => {});
+  }, [isTest]);
+
+  const isEdit = !!initialValues;
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    onSubmit({ description, date, amount: parseFloat(amount), userName });
+    onClose();
+  }
+
+  return (
+    <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+      {/* Header */}
+      <h2 style={{
+        fontFamily: "var(--font-display), serif",
+        fontStyle: "italic",
+        fontWeight: 300,
+        fontSize: "1.75rem",
+        lineHeight: 1,
+        letterSpacing: "-0.02em",
+        fontVariationSettings: '"SOFT" 100, "WONK" 1',
+        color: CHARCOAL,
+        margin: 0,
+      }}>
+        {isEdit ? "Editar ingreso" : t.income.title}
+      </h2>
+
+      {/* Amount */}
+      <div style={{ textAlign: "center", padding: "10px 0 4px" }}>
+        <div style={{ display: "inline-flex", alignItems: "baseline", gap: 6 }}>
+          <span style={{
+            fontFamily: "var(--font-display), serif",
+            fontStyle: "italic",
+            fontWeight: 300,
+            fontSize: "2rem",
+            color: MUTED,
+          }}>€</span>
+          <input
+            type="number"
+            inputMode="decimal"
+            step="0.01"
+            min="0"
+            placeholder="0,00"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            required
+            style={{
+              fontFamily: "var(--font-display), serif",
+              fontStyle: "italic",
+              fontWeight: 300,
+              fontSize: "3.25rem",
+              lineHeight: 1,
+              letterSpacing: "-0.03em",
+              color: CHARCOAL,
+              border: "none",
+              borderBottom: `2px solid ${BORDER}`,
+              background: "transparent",
+              outline: "none",
+              width: "6ch",
+              textAlign: "center",
+              padding: "0 0 6px",
+            }}
+          />
+        </div>
+      </div>
+
+      {/* Description — optional for income, unlike expense */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        <Label className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: MUTED }}>
+          {t.income.description}
+        </Label>
+        <Input
+          placeholder={t.income.descriptionPlaceholder}
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          className="h-auto rounded-none border-x-0 border-t-0 border-b bg-transparent px-0 pb-2 focus-visible:ring-0 millys-input"
+          style={{ color: CHARCOAL }}
+        />
+      </div>
+
+      {/* Date */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        <Label className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: MUTED }}>
+          {t.income.date}
+        </Label>
+        <DatePicker
+          value={date}
+          onChange={setDate}
+          months={t.calendar.months}
+          days={t.calendar.days}
+          placeholder={t.income.datePlaceholder}
+        />
+      </div>
+
+      {/* User selector — non-Test users only */}
+      {!isTest && users.length > 1 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <Label className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: MUTED }}>
+            Usuario
+          </Label>
+          <Select value={userName} onValueChange={(v) => setUserName(v ?? userName)}>
+            <SelectTrigger
+              className="w-full rounded-none border-x-0 border-t-0 border-b bg-transparent px-0 pb-2 focus-visible:ring-0 millys-input"
+              style={{ color: CHARCOAL }}
+            >
+              {userName}
+            </SelectTrigger>
+            <SelectContent>
+              {users.map(u => (
+                <SelectItem key={u} value={u}>{u}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      {/* Actions */}
+      <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
+        <button
+          type="button"
+          onClick={onClose}
+          style={{
+            flex: 1, height: 44,
+            borderRadius: 999,
+            border: `1px solid ${BORDER}`,
+            background: "transparent",
+            color: "#78726A",
+            fontSize: "0.875rem",
+            fontWeight: 500,
+            cursor: "pointer",
+            transition: "border-color 0.15s ease",
+          }}
+        >
+          {t.income.cancel}
+        </button>
+        <button
+          type="submit"
+          disabled={!amount}
+          className="millys-btn"
+          style={{
+            flex: 2, height: 44,
+            borderRadius: 999,
+            border: "none",
+            background: CHARCOAL,
+            color: CARD,
+            fontSize: "0.875rem",
+            fontWeight: 600,
+            cursor: "pointer",
+            letterSpacing: "0.02em",
+            opacity: !amount ? 0.4 : 1,
+          }}
+        >
+          {isEdit ? "Guardar" : t.income.add}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+// ── Gasto / Ingreso toggle — single connected pill, states are exclusive ──
+function KindToggle({ kind, onChange }: { kind: "expense" | "income"; onChange: (k: "expense" | "income") => void }) {
+  const { t } = useLang();
+  return (
+    <div style={{ display: "flex", gap: 6, padding: 4, background: "#F2EBE1", borderRadius: 999, marginBottom: 4 }}>
+      {(["expense", "income"] as const).map(k => {
+        const active = kind === k;
+        return (
+          <button
+            key={k}
+            type="button"
+            onClick={() => onChange(k)}
+            style={{
+              flex: 1,
+              padding: "8px 0",
+              borderRadius: 999,
+              border: "none",
+              background: active ? CHARCOAL : "transparent",
+              color: active ? CARD : "#78726A",
+              fontSize: "0.8rem",
+              fontWeight: active ? 600 : 500,
+              cursor: "pointer",
+              transition: "background 0.15s ease, color 0.15s ease",
+            }}
+          >
+            {k === "expense" ? t.expense.kindExpense : t.expense.kindIncome}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 // ── Reusable dialog shell ─────────────────────────────────────────────────
 export function ExpenseDialog({
   open,
@@ -464,10 +524,78 @@ export function ExpenseDialog({
   );
 }
 
+// ── Income-only dialog shell — used to edit an existing income entry from the
+// Ingresos list on the Ahorro page. Adding a new one goes through AddEntryDialog's
+// toggle instead. ─────────────────────────────────────────────────────────
+export function IncomeDialog({
+  open,
+  onOpenChange,
+  initialValues,
+  onSubmit,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  initialValues?: Pick<Income, "description" | "date" | "amount" | "userName">;
+  onSubmit: (data: IncomeData) => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent style={{
+        maxWidth: 420,
+        width: "calc(100vw - 32px)",
+        borderRadius: 20,
+        padding: "32px 28px 28px",
+        background: CARD,
+        border: "1px solid rgba(0,0,0,0.06)",
+        boxShadow: "0 24px 64px rgba(42,39,32,0.14), 0 4px 16px rgba(42,39,32,0.06)",
+      }}>
+        <IncomeForm onClose={() => onOpenChange(false)} initialValues={initialValues} onSubmit={onSubmit} />
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ── Combined add dialog — Gasto/Ingreso toggle, "add" only (never edit) ────
+export function AddEntryDialog({
+  open,
+  onOpenChange,
+  onSubmitExpense,
+  onSubmitIncome,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  onSubmitExpense: (data: ExpenseData) => void;
+  onSubmitIncome: (data: IncomeData) => void;
+}) {
+  const [kind, setKind] = useState<"expense" | "income">("expense");
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent style={{
+        maxWidth: 420,
+        width: "calc(100vw - 32px)",
+        borderRadius: 20,
+        padding: "32px 28px 28px",
+        background: CARD,
+        border: "1px solid rgba(0,0,0,0.06)",
+        boxShadow: "0 24px 64px rgba(42,39,32,0.14), 0 4px 16px rgba(42,39,32,0.06)",
+      }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+          <KindToggle kind={kind} onChange={setKind} />
+          {kind === "expense"
+            ? <ExpenseForm onClose={() => onOpenChange(false)} onSubmit={onSubmitExpense} />
+            : <IncomeForm onClose={() => onOpenChange(false)} onSubmit={onSubmitIncome} />}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ── Trigger button ────────────────────────────────────────────────────────
 export function AddExpenseButton() {
   const [open, setOpen]   = useState(false);
   const { addExpense }    = useExpenses();
+  const { addIncome }     = useIncome();
 
   return (
     <>
@@ -493,7 +621,7 @@ export function AddExpenseButton() {
         <Plus size={16} color={CARD} strokeWidth={2.5} />
       </button>
 
-      <ExpenseDialog open={open} onOpenChange={setOpen} onSubmit={addExpense} />
+      <AddEntryDialog open={open} onOpenChange={setOpen} onSubmitExpense={addExpense} onSubmitIncome={addIncome} />
     </>
   );
 }

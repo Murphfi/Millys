@@ -13,7 +13,7 @@ export function parseExpenseDate(iso: string): Date {
   return new Date(iso + "T12:00:00");
 }
 
-function inMonth(e: Expense, month: number, year: number): boolean {
+function inMonth(e: { date: string }, month: number, year: number): boolean {
   const d = parseExpenseDate(e.date);
   return d.getMonth() === month && d.getFullYear() === year;
 }
@@ -42,8 +42,8 @@ export function getMonthGrid(year: number, month: number): Date[] {
   return grid[35].getMonth() !== month ? grid.slice(0, 35) : grid;
 }
 
-export function getMonthTotal(expenses: Expense[], month: number, year: number): number {
-  return expenses.filter(e => inMonth(e, month, year)).reduce((s, e) => s + e.amount, 0);
+export function getMonthTotal(items: { amount: number; date: string }[], month: number, year: number): number {
+  return items.filter(e => inMonth(e, month, year)).reduce((s, e) => s + e.amount, 0);
 }
 
 export function getPrevMonth(month: number, year: number): { month: number; year: number } {
@@ -59,9 +59,9 @@ export function getMonthComparisonPct(expenses: Expense[], month: number, year: 
   return ((total - prevTotal) / prevTotal) * 100;
 }
 
-export function getUserTotals(expenses: Expense[], month: number, year: number): [string, number][] {
+export function getUserTotals(items: { userName: string; amount: number; date: string }[], month: number, year: number): [string, number][] {
   const map: Record<string, number> = {};
-  expenses.filter(e => inMonth(e, month, year)).forEach(e => { map[e.userName] = (map[e.userName] ?? 0) + e.amount; });
+  items.filter(e => inMonth(e, month, year)).forEach(e => { map[e.userName] = (map[e.userName] ?? 0) + e.amount; });
   return Object.entries(map).sort((a, b) => b[1] - a[1]);
 }
 
@@ -90,7 +90,33 @@ export function getCategoryTotals(
 }
 
 function fmtCurrency(n: number): string {
-  return n.toLocaleString("es-ES", { minimumFractionDigits: 2 }) + " €";
+  return n.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
+}
+
+export type CategoryComparisonEntry = CategoryEntry & { prevAmount: number; pctChange: number | null };
+
+/**
+ * Same categories/order as getCategoryTotals (current month, sorted by spend
+ * descending), each annotated with its previous-month amount and % change.
+ * pctChange is null when there's nothing to compare against (new category).
+ */
+export function getCategoryComparison(
+  expenses: Expense[],
+  month: number,
+  year: number,
+  getCat: (id: string) => Category | undefined,
+  t: ReturnType<typeof useLang>["t"],
+  fallbackColor: string,
+): CategoryComparisonEntry[] {
+  const current = getCategoryTotals(expenses, month, year, getCat, t, fallbackColor);
+  const { month: pm, year: py } = getPrevMonth(month, year);
+  const prevTotals = getCategoryTotals(expenses, pm, py, getCat, t, fallbackColor);
+  const prevMap = new Map(prevTotals.map(e => [e.id, e.amount]));
+  return current.map(e => {
+    const prevAmount = prevMap.get(e.id) ?? 0;
+    const pctChange = prevAmount > 0 ? ((e.amount - prevAmount) / prevAmount) * 100 : null;
+    return { ...e, prevAmount, pctChange };
+  });
 }
 
 const CHARCOAL = "#2A2720";
@@ -102,13 +128,14 @@ const MUTED    = "#A09890";
  * amount labeled on every bar (accessibility rule: never rely on bar length
  * alone). Clicking a bar toggles it as the active filter via `onSelect`.
  */
-export function CategoryBars({ expenses, month, year, getCat, selected, onSelect }: {
+export function CategoryBars({ expenses, month, year, getCat, selected, onSelect, barHeight = 5 }: {
   expenses: Expense[];
   month: number;
   year: number;
   getCat: (id: string) => Category | undefined;
   selected?: string | null;
   onSelect?: (id: string | null) => void;
+  barHeight?: number;
 }) {
   const { t } = useLang();
   const [animated, setAnimated] = useState(false);
@@ -151,7 +178,7 @@ export function CategoryBars({ expenses, month, year, getCat, selected, onSelect
                 {fmtCurrency(amount)}
               </span>
             </div>
-            <div style={{ height: 5, background: "#EDE8DF", borderRadius: 999, overflow: "hidden" }}>
+            <div style={{ height: barHeight, background: "#EDE8DF", borderRadius: 999, overflow: "hidden" }}>
               <div style={{
                 height: "100%",
                 width: animated ? `${(amount / maxAmt) * 100}%` : "0%",

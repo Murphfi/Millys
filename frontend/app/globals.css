@@ -177,6 +177,16 @@
     box-shadow: 0 6px 20px rgba(42, 39, 32, 0.18);
   }
 
+  /* ── Home: press feedback with spring overshoot on release ── */
+  .millys-day-cell,
+  .millys-recent-row {
+    transition: background 0.15s ease, transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .millys-day-cell:active,
+  .millys-recent-row:active {
+    transform: scale(0.94);
+  }
+
   /* ── Bocadillo: bridge + corner system ───────────────────────────────────
      The subscreen has left:20px, creating a 20px sage gap.
      .millys-bridge fills that gap with white AT the active tab's height

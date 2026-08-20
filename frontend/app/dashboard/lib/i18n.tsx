@@ -8,8 +8,8 @@ const LANG_STORAGE_KEY = "millys_lang";
 
 export const TRANSLATIONS = {
   es: {
-    nav: { home: "Home", global: "Global", expenses: "Gastos", config: "Config" },
-    home: { recent: "Últimos gastos", seeAll: "Ver todos", projection: "Proyección a fin de mes", viewAllExpenses: "Ver todos los gastos" },
+    nav: { home: "Home", global: "Global", expenses: "Gastos", ahorro: "Ahorro", config: "Config" },
+    home: { recent: "Últimos gastos", seeAll: "Ver todos", projection: "Proyección a fin de mes", viewAllExpenses: "Ver todos los gastos", split: "Reparto", variation: "Variación por categoría", newCategory: "Nuevo", summary: "Resumen" },
     expenses: {
       viewDay: "Día", viewWeek: "Semana", viewMonth: "Mes", viewCalendar: "Calendario",
       empty: "Sin gastos", loading: "Cargando...", today: "Hoy", total: "Total gastos", categoryTitle: "Gastos por categoría", clearFilter: "Ver todas",
@@ -17,6 +17,8 @@ export const TRANSLATIONS = {
     },
     expense: {
       title: "Nuevo gasto",
+      kindExpense: "Gasto",
+      kindIncome: "Ingreso",
       category: "Categoría",
       categoryPlaceholder: "Selecciona categoría",
       description: "Descripción",
@@ -25,6 +27,44 @@ export const TRANSLATIONS = {
       datePlaceholder: "dd/mm/aaaa",
       cancel: "Cancelar",
       add: "Añadir gasto",
+    },
+    income: {
+      title: "Nuevo ingreso",
+      description: "Descripción",
+      descriptionPlaceholder: "Ej. Nómina, freelance, reembolso...",
+      date: "Fecha",
+      datePlaceholder: "dd/mm/aaaa",
+      cancel: "Cancelar",
+      add: "Añadir ingreso",
+    },
+    savings: {
+      title: "Nuevo movimiento",
+      destination: "Destino",
+      destinationPlaceholder: "Selecciona destino",
+      description: "Descripción",
+      descriptionPlaceholder: "Nota opcional",
+      date: "Fecha",
+      datePlaceholder: "dd/mm/aaaa",
+      cancel: "Cancelar",
+      add: "Añadir ahorro",
+    },
+    savingsDestinations: {
+      "trade-republic": "Trade Republic",
+      "cuenta-conjunta": "Cuenta conjunta",
+    },
+    ahorro: {
+      incomeTitle: "Ingresos",
+      breakdownTitle: "Reparto sugerido",
+      needs: "Necesidades 50%",
+      wants: "Deseos 30%",
+      savingsTarget: "Ahorro 20%",
+      savingsTotalTitle: "Ahorrado este mes",
+      aboveTarget: "por encima del objetivo",
+      belowTarget: "por debajo del objetivo",
+      movementsTitle: "Movimientos",
+      empty: "Sin movimientos este mes",
+      emptyIncome: "Añade el ingreso del mes para ver el reparto sugerido",
+      incomeListTitle: "Ingresos del mes",
     },
     settings: {
       categoriesTitle: "Categorías",
@@ -47,6 +87,12 @@ export const TRANSLATIONS = {
       add: "No se ha podido añadir el gasto. Inténtalo de nuevo.",
       update: "No se ha podido guardar el cambio. Se ha revertido.",
       delete: "No se ha podido eliminar el gasto. Se ha restaurado.",
+      addIncome: "No se ha podido añadir el ingreso. Inténtalo de nuevo.",
+      updateIncome: "No se ha podido guardar el cambio. Se ha revertido.",
+      deleteIncome: "No se ha podido eliminar el ingreso. Se ha restaurado.",
+      addSaving: "No se ha podido añadir el movimiento. Inténtalo de nuevo.",
+      updateSaving: "No se ha podido guardar el cambio. Se ha revertido.",
+      deleteSaving: "No se ha podido eliminar el movimiento. Se ha restaurado.",
     },
     languages: { es: "Español", en: "English", ca: "Català" },
     categories: {
@@ -61,8 +107,8 @@ export const TRANSLATIONS = {
     },
   },
   en: {
-    nav: { home: "Home", global: "Global", expenses: "Expenses", config: "Config" },
-    home: { recent: "Recent expenses", seeAll: "See all", projection: "Projected by month's end", viewAllExpenses: "View all expenses" },
+    nav: { home: "Home", global: "Global", expenses: "Expenses", ahorro: "Savings", config: "Config" },
+    home: { recent: "Recent expenses", seeAll: "See all", projection: "Projected by month's end", viewAllExpenses: "View all expenses", split: "Split", variation: "Category change", newCategory: "New", summary: "Summary" },
     expenses: {
       viewDay: "Day", viewWeek: "Week", viewMonth: "Month", viewCalendar: "Calendar",
       empty: "No expenses", loading: "Loading...", today: "Today", total: "Total expenses", categoryTitle: "Spending by category", clearFilter: "Show all",
@@ -70,6 +116,8 @@ export const TRANSLATIONS = {
     },
     expense: {
       title: "New expense",
+      kindExpense: "Expense",
+      kindIncome: "Income",
       category: "Category",
       categoryPlaceholder: "Select category",
       description: "Description",
@@ -78,6 +126,44 @@ export const TRANSLATIONS = {
       datePlaceholder: "dd/mm/yyyy",
       cancel: "Cancel",
       add: "Add expense",
+    },
+    income: {
+      title: "New income",
+      description: "Description",
+      descriptionPlaceholder: "E.g. Salary, freelance, refund...",
+      date: "Date",
+      datePlaceholder: "dd/mm/yyyy",
+      cancel: "Cancel",
+      add: "Add income",
+    },
+    savings: {
+      title: "New movement",
+      destination: "Destination",
+      destinationPlaceholder: "Select destination",
+      description: "Description",
+      descriptionPlaceholder: "Optional note",
+      date: "Date",
+      datePlaceholder: "dd/mm/yyyy",
+      cancel: "Cancel",
+      add: "Add savings",
+    },
+    savingsDestinations: {
+      "trade-republic": "Trade Republic",
+      "cuenta-conjunta": "Joint account",
+    },
+    ahorro: {
+      incomeTitle: "Income",
+      breakdownTitle: "Suggested split",
+      needs: "Needs 50%",
+      wants: "Wants 30%",
+      savingsTarget: "Savings 20%",
+      savingsTotalTitle: "Saved this month",
+      aboveTarget: "above target",
+      belowTarget: "below target",
+      movementsTitle: "Movements",
+      empty: "No movements this month",
+      emptyIncome: "Add this month's income to see the suggested split",
+      incomeListTitle: "This month's income",
     },
     settings: {
       categoriesTitle: "Categories",
@@ -100,6 +186,12 @@ export const TRANSLATIONS = {
       add: "Couldn't add the expense. Please try again.",
       update: "Couldn't save the change. It's been reverted.",
       delete: "Couldn't delete the expense. It's been restored.",
+      addIncome: "Couldn't add the income. Please try again.",
+      updateIncome: "Couldn't save the change. It's been reverted.",
+      deleteIncome: "Couldn't delete the income. It's been restored.",
+      addSaving: "Couldn't add the movement. Please try again.",
+      updateSaving: "Couldn't save the change. It's been reverted.",
+      deleteSaving: "Couldn't delete the movement. It's been restored.",
     },
     languages: { es: "Español", en: "English", ca: "Català" },
     categories: {
@@ -114,8 +206,8 @@ export const TRANSLATIONS = {
     },
   },
   ca: {
-    nav: { home: "Inici", global: "Global", expenses: "Despeses", config: "Config" },
-    home: { recent: "Últimes despeses", seeAll: "Veure-les totes", projection: "Projecció a final de mes", viewAllExpenses: "Veure totes les despeses" },
+    nav: { home: "Inici", global: "Global", expenses: "Despeses", ahorro: "Estalvi", config: "Config" },
+    home: { recent: "Últimes despeses", seeAll: "Veure-les totes", projection: "Projecció a final de mes", viewAllExpenses: "Veure totes les despeses", split: "Repartiment", variation: "Variació per categoria", newCategory: "Nou", summary: "Resum" },
     expenses: {
       viewDay: "Dia", viewWeek: "Setmana", viewMonth: "Mes", viewCalendar: "Calendari",
       empty: "Sense despeses", loading: "Carregant...", today: "Avui", total: "Total despeses", categoryTitle: "Despeses per categoria", clearFilter: "Veure-les totes",
@@ -123,6 +215,8 @@ export const TRANSLATIONS = {
     },
     expense: {
       title: "Nova despesa",
+      kindExpense: "Despesa",
+      kindIncome: "Ingrés",
       category: "Categoria",
       categoryPlaceholder: "Selecciona una categoria",
       description: "Descripció",
@@ -131,6 +225,44 @@ export const TRANSLATIONS = {
       datePlaceholder: "dd/mm/aaaa",
       cancel: "Cancel·la",
       add: "Afegir despesa",
+    },
+    income: {
+      title: "Nou ingrés",
+      description: "Descripció",
+      descriptionPlaceholder: "Ex. Nòmina, freelance, reemborsament...",
+      date: "Data",
+      datePlaceholder: "dd/mm/aaaa",
+      cancel: "Cancel·la",
+      add: "Afegir ingrés",
+    },
+    savings: {
+      title: "Nou moviment",
+      destination: "Destí",
+      destinationPlaceholder: "Selecciona destí",
+      description: "Descripció",
+      descriptionPlaceholder: "Nota opcional",
+      date: "Data",
+      datePlaceholder: "dd/mm/aaaa",
+      cancel: "Cancel·la",
+      add: "Afegir estalvi",
+    },
+    savingsDestinations: {
+      "trade-republic": "Trade Republic",
+      "cuenta-conjunta": "Compte conjunt",
+    },
+    ahorro: {
+      incomeTitle: "Ingressos",
+      breakdownTitle: "Repartiment suggerit",
+      needs: "Necessitats 50%",
+      wants: "Desitjos 30%",
+      savingsTarget: "Estalvi 20%",
+      savingsTotalTitle: "Estalviat aquest mes",
+      aboveTarget: "per sobre de l'objectiu",
+      belowTarget: "per sota de l'objectiu",
+      movementsTitle: "Moviments",
+      empty: "Sense moviments aquest mes",
+      emptyIncome: "Afegeix l'ingrés del mes per veure el repartiment suggerit",
+      incomeListTitle: "Ingressos del mes",
     },
     settings: {
       categoriesTitle: "Categories",
@@ -153,6 +285,12 @@ export const TRANSLATIONS = {
       add: "No s'ha pogut afegir la despesa. Torna-ho a provar.",
       update: "No s'ha pogut desar el canvi. S'ha revertit.",
       delete: "No s'ha pogut eliminar la despesa. S'ha restaurat.",
+      addIncome: "No s'ha pogut afegir l'ingrés. Torna-ho a provar.",
+      updateIncome: "No s'ha pogut desar el canvi. S'ha revertit.",
+      deleteIncome: "No s'ha pogut eliminar l'ingrés. S'ha restaurat.",
+      addSaving: "No s'ha pogut afegir el moviment. Torna-ho a provar.",
+      updateSaving: "No s'ha pogut desar el canvi. S'ha revertit.",
+      deleteSaving: "No s'ha pogut eliminar el moviment. S'ha restaurat.",
     },
     languages: { es: "Español", en: "English", ca: "Català" },
     categories: {
@@ -212,4 +350,14 @@ export function useLang() {
 export function getCategoryLabel(cat: { id: string; label: string }, t: T): string {
   const catT = t.categories as Record<string, string | undefined>;
   return catT[cat.id] ?? cat.label;
+}
+
+/**
+ * Returns the translated label for a savings destination — "Cuenta conjunta"
+ * varies per locale, "Trade Republic" is a brand name and stays as-is via the
+ * fallback.
+ */
+export function getDestinationLabel(dest: { code: string; label: string }, t: T): string {
+  const destT = t.savingsDestinations as Record<string, string | undefined>;
+  return destT[dest.code] ?? dest.label;
 }
