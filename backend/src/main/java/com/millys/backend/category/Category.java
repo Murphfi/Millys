@@ -5,6 +5,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.time.OffsetDateTime;
+
 @Entity
 @Table(name = "categories")
 @Getter
@@ -19,7 +21,7 @@ public class Category {
     @Column(nullable = false, unique = true, length = 50)
     private String code;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 100)
     private String label;
 
     @Column(nullable = false, length = 7)
@@ -30,4 +32,7 @@ public class Category {
 
     @Column(name = "no_description", nullable = false)
     private boolean noDescription;
+
+    @Column(name = "created_at", nullable = false, insertable = false, updatable = false)
+    private OffsetDateTime createdAt;
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { apiFetch, isTestUser } from "./api";
 
 export type Income = {
   id: string;
@@ -13,24 +14,6 @@ export type Income = {
 // ── Storage / API helpers ─────────────────────────────────────────────────
 
 const STORAGE_KEY = "millys_income_v1";
-const API_URL     = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
-
-function getToken(): string {
-  return localStorage.getItem("token") ?? sessionStorage.getItem("token") ?? "";
-}
-
-function getCurrentUsername(): string {
-  try {
-    const token = getToken();
-    if (!token) return "";
-    const payload = JSON.parse(atob(token.split(".")[1]));
-    return payload.sub ?? payload.username ?? "";
-  } catch { return ""; }
-}
-
-function isTestUser(): boolean {
-  return getCurrentUsername().toLowerCase() === "test";
-}
 
 // Shape returned by the API
 type ApiIncome = {
@@ -61,13 +44,6 @@ function toPayload(partial: Omit<Income, "id">): IncomePayload {
     date:        partial.date,
     userName:    partial.userName,
   };
-}
-
-async function apiFetch(path: string, options: RequestInit = {}): Promise<Response> {
-  return fetch(`${API_URL}${path}`, {
-    ...options,
-    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${getToken()}`, ...options.headers },
-  });
 }
 
 // ── Seed data (Test user only) ────────────────────────────────────────────

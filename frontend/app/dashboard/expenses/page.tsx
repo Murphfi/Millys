@@ -3,12 +3,13 @@
 import { useEffect, useRef, useState, useMemo, useCallback, Suspense } from "react";
 import { createPortal } from "react-dom";
 import { useSearchParams } from "next/navigation";
-import { Pencil, Trash2, ChevronLeft, ChevronRight, X, TrendingUp, TrendingDown } from "lucide-react";
+import { Pencil, Trash2, ChevronLeft, ChevronRight, TrendingUp, TrendingDown } from "lucide-react";
 import { useLang, getCategoryLabel } from "../lib/i18n";
 import { useCategories, type Category } from "../lib/categories";
 import { useExpenses, type Expense } from "../lib/expenses";
 import { ExpenseDialog } from "../add-expense-dialog";
 import { useTopBarSlot } from "../lib/topbar-slot";
+import { SyncErrorBanner } from "../sync-error-banner";
 import {
   CategoryBars, getMonthTotal, getMonthComparisonPct, getUserTotals, getPrevMonth,
   getMonthGrid, toDateKey, todayDate as today, isSameDay as sameDay,
@@ -79,33 +80,6 @@ function EmptyState({ label }: { label: string }) {
   );
 }
 
-
-function SyncErrorBanner({ message, onDismiss }: { message: string; onDismiss: () => void }) {
-  return (
-    <div
-      style={{
-        flexShrink: 0,
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        padding: "8px 16px",
-        background: "#FEF2F2",
-        borderBottom: `1px solid ${BORDER}`,
-        color: "#B91C1C",
-        fontSize: "0.78rem",
-      }}
-    >
-      <span style={{ flex: 1 }}>{message}</span>
-      <button
-        onClick={onDismiss}
-        aria-label="Cerrar"
-        style={{ background: "transparent", border: "none", cursor: "pointer", color: "#B91C1C", display: "flex", padding: 2 }}
-      >
-        <X size={13} strokeWidth={2} />
-      </button>
-    </div>
-  );
-}
 
 function Fraunces({ children, size = "1.55rem" }: { children: React.ReactNode; size?: string }) {
   return (
@@ -789,7 +763,7 @@ export default function ExpensesPage() {
 // useSearchParams() (for the ?category= deep link from Home) requires a Suspense
 // boundary around its caller in the App Router — the wrapper above provides it.
 function ExpensesPageInner() {
-  const [categories]      = useCategories();
+  const { categories }    = useCategories();
   const { expenses, ready, syncError, dismissSyncError } = useExpenses();
   const { t }              = useLang();
   const searchParams       = useSearchParams();

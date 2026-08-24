@@ -15,7 +15,8 @@ import {
   SelectTrigger,
 } from "@/components/ui/select";
 import { useLang, getDestinationLabel } from "../lib/i18n";
-import { getCurrentUsername } from "../lib/expenses";
+import { apiFetch, getCurrentUsername } from "../lib/api";
+import { todayDate, toDateKey } from "../lib/stats";
 import { useSavings, SAVINGS_DESTINATIONS, type SavingsEntry } from "../lib/savings";
 import { DatePicker } from "../date-picker";
 
@@ -25,8 +26,6 @@ const MUTED    = "#A09890";
 const BORDER   = "#DDD7CC";
 const CARD     = "#FAF9F7";
 const SAGE     = "#5E7C64";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
 function DestDot({ color }: { color: string }) {
   return (
@@ -56,17 +55,17 @@ function SavingsForm({
   const currentUser                       = getCurrentUsername();
   const isTest                            = currentUser.toLowerCase() === "test";
   const [amount, setAmount]               = useState(initialValues?.amount?.toString() ?? "");
+  const validAmount                       = parseFloat(amount) > 0;
   const [destinationCode, setDestination] = useState(initialValues?.destinationCode ?? "");
   const [description, setDescription]     = useState(initialValues?.description ?? "");
-  const [date, setDate]                   = useState(initialValues?.date ?? new Date().toISOString().slice(0, 10));
+  const [date, setDate]                   = useState(initialValues?.date ?? toDateKey(todayDate()));
   const [userName, setUserName]           = useState(initialValues?.userName ?? currentUser);
   const [users, setUsers]                 = useState<string[]>([]);
 
   // Fetch real user list for non-Test sessions
   useEffect(() => {
     if (isTest) return;
-    const token = localStorage.getItem("token") ?? sessionStorage.getItem("token") ?? "";
-    fetch(`${API_URL}/api/users`, { headers: { "Authorization": `Bearer ${token}` } })
+    apiFetch("/api/users")
       .then(r => r.json())
       .then((data: string[]) => setUsers(data.filter(u => u.toLowerCase() !== "test")))
       .catch(() => {});
@@ -95,7 +94,7 @@ function SavingsForm({
         color: CHARCOAL,
         margin: 0,
       }}>
-        {isEdit ? "Editar movimiento" : t.savings.title}
+        {isEdit ? t.savings.editTitle : t.savings.title}
       </h2>
 
       {/* Amount */}
@@ -112,7 +111,7 @@ function SavingsForm({
             type="number"
             inputMode="decimal"
             step="0.01"
-            min="0"
+            min="0.01"
             placeholder="0,00"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
@@ -176,6 +175,7 @@ function SavingsForm({
         </Label>
         <Input
           placeholder={t.savings.descriptionPlaceholder}
+          maxLength={200}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           className="h-auto rounded-none border-x-0 border-t-0 border-b bg-transparent px-0 pb-2 focus-visible:ring-0 millys-input"
@@ -240,7 +240,7 @@ function SavingsForm({
         </button>
         <button
           type="submit"
-          disabled={!amount || !destinationCode}
+          disabled={!validAmount || !destinationCode}
           className="millys-btn"
           style={{
             flex: 2, height: 44,
@@ -252,10 +252,10 @@ function SavingsForm({
             fontWeight: 600,
             cursor: "pointer",
             letterSpacing: "0.02em",
-            opacity: !amount || !destinationCode ? 0.4 : 1,
+            opacity: !validAmount || !destinationCode ? 0.4 : 1,
           }}
         >
-          {isEdit ? "Guardar" : t.savings.add}
+          {isEdit ? t.savings.save : t.savings.add}
         </button>
       </div>
     </form>

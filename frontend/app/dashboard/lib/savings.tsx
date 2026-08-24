@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { apiFetch, isTestUser } from "./api";
 
 export type SavingsEntry = {
   id: string;
@@ -15,7 +16,7 @@ export type SavingsDestination = { code: string; label: string; color: string };
 
 // The two known destinations today — free-text code on the backend (like
 // categoryCode on Expense), display metadata owned entirely by the frontend.
-// Colors picked from the existing palette in lib/categories.ts, distinct from
+// Colors picked from the existing palette in lib/categories.tsx, distinct from
 // #D9A0A8 (Lilly, in home/page.tsx's USER_COLORS) and #9AB89D (nav-off green).
 export const SAVINGS_DESTINATIONS: SavingsDestination[] = [
   { code: "trade-republic",  label: "Trade Republic",  color: "#6B8FA6" },
@@ -25,24 +26,6 @@ export const SAVINGS_DESTINATIONS: SavingsDestination[] = [
 // ── Storage / API helpers ─────────────────────────────────────────────────
 
 const STORAGE_KEY = "millys_savings_v1";
-const API_URL     = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
-
-function getToken(): string {
-  return localStorage.getItem("token") ?? sessionStorage.getItem("token") ?? "";
-}
-
-function getCurrentUsername(): string {
-  try {
-    const token = getToken();
-    if (!token) return "";
-    const payload = JSON.parse(atob(token.split(".")[1]));
-    return payload.sub ?? payload.username ?? "";
-  } catch { return ""; }
-}
-
-function isTestUser(): boolean {
-  return getCurrentUsername().toLowerCase() === "test";
-}
 
 // Shape returned by the API
 type ApiSavingsEntry = {
@@ -76,13 +59,6 @@ function toPayload(partial: Omit<SavingsEntry, "id">): SavingsPayload {
     date:            partial.date,
     userName:        partial.userName,
   };
-}
-
-async function apiFetch(path: string, options: RequestInit = {}): Promise<Response> {
-  return fetch(`${API_URL}${path}`, {
-    ...options,
-    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${getToken()}`, ...options.headers },
-  });
 }
 
 // ── Seed data (Test user only) ────────────────────────────────────────────

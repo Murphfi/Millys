@@ -210,7 +210,7 @@ function CategoryVariation({ expenses, month, year, getCat }: {
 export default function DashboardHome() {
   const router = useRouter();
   const { t } = useLang();
-  const [categories] = useCategories();
+  const { categories } = useCategories();
   const { expenses, ready, updateExpense } = useExpenses();
   const { income } = useIncome();
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);

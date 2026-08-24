@@ -55,7 +55,9 @@ public class SecurityConfig {
         // does exact-string comparison, so a literal wildcard there never matches.
         config.setAllowedOriginPatterns(List.of(
                 "http://localhost:3000",
-                "https://*.vercel.app"
+                "https://*.vercel.app",
+                "https://millys.es",
+                "https://www.millys.es"
         ));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));

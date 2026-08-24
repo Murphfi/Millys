@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Home, BarChart3, Receipt, LogOut, Settings, PiggyBank } from "lucide-react";
 import { AddExpenseButton } from "./add-expense-dialog";
 import { LangProvider, useLang } from "./lib/i18n";
+import { CategoriesProvider } from "./lib/categories";
 import { ExpensesProvider } from "./lib/expenses";
 import { IncomeProvider } from "./lib/income";
 import { SavingsProvider } from "./lib/savings";
@@ -212,13 +213,15 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <LangProvider>
-      <ExpensesProvider>
-        <IncomeProvider>
-          <SavingsProvider>
-            <DashboardContent>{children}</DashboardContent>
-          </SavingsProvider>
-        </IncomeProvider>
-      </ExpensesProvider>
+      <CategoriesProvider>
+        <ExpensesProvider>
+          <IncomeProvider>
+            <SavingsProvider>
+              <DashboardContent>{children}</DashboardContent>
+            </SavingsProvider>
+          </IncomeProvider>
+        </ExpensesProvider>
+      </CategoriesProvider>
     </LangProvider>
   );
 }

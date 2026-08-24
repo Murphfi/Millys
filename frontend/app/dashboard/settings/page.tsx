@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Pencil, Trash2, Plus, Check, X } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useCategories, COLOR_PALETTE, type Category } from "../lib/categories";
 import { useLang, getCategoryLabel, type Lang } from "../lib/i18n";
-import { apiFetch } from "../lib/expenses";
+import { SyncErrorBanner } from "../sync-error-banner";
 
 const STONE    = "#78726A";
 const MUTED    = "#A09890";
@@ -201,20 +201,6 @@ function EditRow({
   );
 }
 
-// ── API response shape ────────────────────────────────────────────────────
-type ApiCategory = {
-  id: number;
-  code: string;
-  label: string;
-  color: string;
-  default: boolean;
-  noDescription: boolean;
-};
-
-function apiToCategory(c: ApiCategory): Category {
-  return { id: c.code, label: c.label, color: c.color, dbId: c.id, noDescription: c.noDescription };
-}
-
 // ── Main settings page ────────────────────────────────────────────────────
 const LANG_OPTIONS: { code: Lang; label: string }[] = [
   { code: "es", label: "Español" },
@@ -223,62 +209,39 @@ const LANG_OPTIONS: { code: Lang; label: string }[] = [
 ];
 
 export default function SettingsPage() {
-  const [categories, setCategories] = useCategories();
+  const {
+    categories, syncError, dismissSyncError,
+    addCategory, updateCategory, deleteCategory,
+  }                                  = useCategories();
   const { lang, setLang, t }        = useLang();
   const [editingId, setEditingId]   = useState<string | null>(null);
   const [adding, setAdding]         = useState(false);
 
-  useEffect(() => {
-    apiFetch("/api/categories")
-      .then(r => r.ok ? r.json() : Promise.reject())
-      .then((data: ApiCategory[]) => { if (data.length > 0) setCategories(data.map(apiToCategory)); })
-      .catch(() => {});
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const categoryErrorMessage = syncError ? t.errors[`${syncError}Category` as keyof typeof t.errors] : null;
 
-  async function handleSaveEdit(id: string, label: string, color: string, noDescription: boolean) {
-    const cat = categories.find(c => c.id === id);
-    if (cat?.dbId) {
-      await apiFetch(`/api/categories/${cat.dbId}`, {
-        method: "PUT",
-        body: JSON.stringify({ code: id, label, color, noDescription }),
-      }).catch(() => {});
-    }
-    setCategories(prev => prev.map(c => c.id === id ? { ...c, label, color, noDescription } : c));
+  function handleSaveEdit(id: string, label: string, color: string, noDescription: boolean) {
+    updateCategory(id, { label, color, noDescription });
     setEditingId(null);
   }
 
-  async function handleAdd(label: string, color: string, noDescription: boolean) {
-    const code = label.toLowerCase().replace(/\s+/g, "_") + "_" + Date.now();
-    let dbId: number | undefined;
-    try {
-      const res = await apiFetch("/api/categories", {
-        method: "POST",
-        body: JSON.stringify({ code, label, color, noDescription }),
-      });
-      if (res.ok) {
-        const created: ApiCategory = await res.json();
-        dbId = created.id;
-      }
-    } catch {}
-    setCategories(prev => [...prev, { id: code, label, color, dbId, noDescription }]);
+  function handleAdd(label: string, color: string, noDescription: boolean) {
+    addCategory({ label, color, noDescription });
     setAdding(false);
   }
 
-  async function handleDelete(id: string) {
-    const cat = categories.find(c => c.id === id);
-    if (cat?.dbId) {
-      await apiFetch(`/api/categories/${cat.dbId}`, {
-        method: "DELETE",
-        headers: { "Content-Type": "" },
-      }).catch(() => {});
-    }
-    setCategories(prev => prev.filter(c => c.id !== id));
+  function handleDelete(id: string) {
+    deleteCategory(id);
   }
 
   const categoryCount = `${categories.length} ${categories.length === 1 ? t.settings.categoryLabel : t.settings.categoryLabelPlural}`;
 
   return (
     <div className="px-4 py-6 md:px-7 md:py-7">
+      {categoryErrorMessage && (
+        <div className="mb-4">
+          <SyncErrorBanner message={categoryErrorMessage} onDismiss={dismissSyncError} />
+        </div>
+      )}
 
       {/* ── Categorías ── */}
       <section style={{ marginBottom: 36 }}>

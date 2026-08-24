@@ -16,8 +16,10 @@ import {
 } from "@/components/ui/select";
 import { useCategories } from "./lib/categories";
 import { useLang, getCategoryLabel } from "./lib/i18n";
-import { useExpenses, getCurrentUsername, type Expense } from "./lib/expenses";
+import { useExpenses, type Expense } from "./lib/expenses";
 import { useIncome, type Income } from "./lib/income";
+import { apiFetch, getCurrentUsername } from "./lib/api";
+import { todayDate, toDateKey } from "./lib/stats";
 import { DatePicker } from "./date-picker";
 
 // ── Design tokens ─────────────────────────────────────────────────────────
@@ -28,9 +30,6 @@ const CARD     = "#FAF9F7";
 const SAGE     = "#5E7C64";
 
 // ── Helpers ───────────────────────────────────────────────────────────────
-const MONTHS_ES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
-const DAYS_ES   = ["Lu","Ma","Mi","Ju","Vi","Sa","Do"];
-
 function CategoryDot({ color }: { color: string }) {
   return (
     <span style={{
@@ -46,8 +45,6 @@ function CategoryDot({ color }: { color: string }) {
 // ── Expense form ──────────────────────────────────────────────────────────
 type ExpenseData = Omit<Expense, "id">;
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
-
 function ExpenseForm({
   onClose,
   initialValues,
@@ -57,22 +54,22 @@ function ExpenseForm({
   initialValues?: Pick<Expense, "categoryId" | "description" | "date" | "amount" | "userName">;
   onSubmit: (data: ExpenseData) => void;
 }) {
-  const [categories]                  = useCategories();
+  const { categories }                = useCategories();
   const { t }                         = useLang();
   const currentUser                   = getCurrentUsername();
   const isTest                        = currentUser.toLowerCase() === "test";
   const [amount, setAmount]           = useState(initialValues?.amount?.toString() ?? "");
+  const validAmount                   = parseFloat(amount) > 0;
   const [categoryId, setCategoryId]   = useState(initialValues?.categoryId ?? "");
   const [description, setDescription] = useState(initialValues?.description ?? "");
-  const [date, setDate]               = useState(initialValues?.date ?? new Date().toISOString().slice(0, 10));
+  const [date, setDate]               = useState(initialValues?.date ?? toDateKey(todayDate()));
   const [userName, setUserName]       = useState(initialValues?.userName ?? currentUser);
   const [users, setUsers]             = useState<string[]>([]);
 
   // Fetch real user list for non-Test sessions
   useEffect(() => {
     if (isTest) return;
-    const token = localStorage.getItem("token") ?? sessionStorage.getItem("token") ?? "";
-    fetch(`${API_URL}/api/users`, { headers: { "Authorization": `Bearer ${token}` } })
+    apiFetch("/api/users")
       .then(r => r.json())
       .then((data: string[]) => setUsers(data.filter(u => u.toLowerCase() !== "test")))
       .catch(() => {});
@@ -102,7 +99,7 @@ function ExpenseForm({
         color: CHARCOAL,
         margin: 0,
       }}>
-        {isEdit ? "Editar gasto" : t.expense.title}
+        {isEdit ? t.expense.editTitle : t.expense.title}
       </h2>
 
       {/* Amount */}
@@ -119,7 +116,7 @@ function ExpenseForm({
             type="number"
             inputMode="decimal"
             step="0.01"
-            min="0"
+            min="0.01"
             placeholder="0,00"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
@@ -187,6 +184,7 @@ function ExpenseForm({
           </Label>
           <Input
             placeholder={t.expense.descriptionPlaceholder}
+            maxLength={200}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             className="h-auto rounded-none border-x-0 border-t-0 border-b bg-transparent px-0 pb-2 focus-visible:ring-0 millys-input"
@@ -252,7 +250,7 @@ function ExpenseForm({
         </button>
         <button
           type="submit"
-          disabled={!amount || !categoryId}
+          disabled={!validAmount || !categoryId}
           className="millys-btn"
           style={{
             flex: 2, height: 44,
@@ -264,10 +262,10 @@ function ExpenseForm({
             fontWeight: 600,
             cursor: "pointer",
             letterSpacing: "0.02em",
-            opacity: !amount || !categoryId ? 0.4 : 1,
+            opacity: !validAmount || !categoryId ? 0.4 : 1,
           }}
         >
-          {isEdit ? "Guardar" : t.expense.add}
+          {isEdit ? t.expense.save : t.expense.add}
         </button>
       </div>
     </form>
@@ -290,16 +288,16 @@ function IncomeForm({
   const currentUser                   = getCurrentUsername();
   const isTest                        = currentUser.toLowerCase() === "test";
   const [amount, setAmount]           = useState(initialValues?.amount?.toString() ?? "");
+  const validAmount                   = parseFloat(amount) > 0;
   const [description, setDescription] = useState(initialValues?.description ?? "");
-  const [date, setDate]               = useState(initialValues?.date ?? new Date().toISOString().slice(0, 10));
+  const [date, setDate]               = useState(initialValues?.date ?? toDateKey(todayDate()));
   const [userName, setUserName]       = useState(initialValues?.userName ?? currentUser);
   const [users, setUsers]             = useState<string[]>([]);
 
   // Fetch real user list for non-Test sessions
   useEffect(() => {
     if (isTest) return;
-    const token = localStorage.getItem("token") ?? sessionStorage.getItem("token") ?? "";
-    fetch(`${API_URL}/api/users`, { headers: { "Authorization": `Bearer ${token}` } })
+    apiFetch("/api/users")
       .then(r => r.json())
       .then((data: string[]) => setUsers(data.filter(u => u.toLowerCase() !== "test")))
       .catch(() => {});
@@ -327,7 +325,7 @@ function IncomeForm({
         color: CHARCOAL,
         margin: 0,
       }}>
-        {isEdit ? "Editar ingreso" : t.income.title}
+        {isEdit ? t.income.editTitle : t.income.title}
       </h2>
 
       {/* Amount */}
@@ -344,7 +342,7 @@ function IncomeForm({
             type="number"
             inputMode="decimal"
             step="0.01"
-            min="0"
+            min="0.01"
             placeholder="0,00"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
@@ -376,6 +374,7 @@ function IncomeForm({
         </Label>
         <Input
           placeholder={t.income.descriptionPlaceholder}
+          maxLength={200}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           className="h-auto rounded-none border-x-0 border-t-0 border-b bg-transparent px-0 pb-2 focus-visible:ring-0 millys-input"
@@ -440,7 +439,7 @@ function IncomeForm({
         </button>
         <button
           type="submit"
-          disabled={!amount}
+          disabled={!validAmount}
           className="millys-btn"
           style={{
             flex: 2, height: 44,
@@ -452,10 +451,10 @@ function IncomeForm({
             fontWeight: 600,
             cursor: "pointer",
             letterSpacing: "0.02em",
-            opacity: !amount ? 0.4 : 1,
+            opacity: !validAmount ? 0.4 : 1,
           }}
         >
-          {isEdit ? "Guardar" : t.income.add}
+          {isEdit ? t.income.save : t.income.add}
         </button>
       </div>
     </form>

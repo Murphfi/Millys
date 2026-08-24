@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Pencil, Trash2, TrendingUp, TrendingDown } from "lucide-react";
 import { useLang, getDestinationLabel } from "../lib/i18n";
 import { useIncome, type Income } from "../lib/income";
@@ -8,6 +8,7 @@ import { useSavings, SAVINGS_DESTINATIONS, type SavingsEntry } from "../lib/savi
 import { getMonthTotal, getUserTotals } from "../lib/stats";
 import { IncomeDialog } from "../add-expense-dialog";
 import { SavingsDialog, AddSavingsButton } from "./add-savings-dialog";
+import { SyncErrorBanner } from "../sync-error-banner";
 
 const CHARCOAL = "#2A2720";
 const STONE    = "#78726A";
@@ -175,8 +176,20 @@ function SplitTile({ label, pct, userTotals }: { label: string; pct: number; use
 
 export default function AhorroPage() {
   const { t } = useLang();
-  const { income, ready: incomeReady } = useIncome();
-  const { savings, ready: savingsReady } = useSavings();
+  const { income, ready: incomeReady, syncError: incomeSyncError, dismissSyncError: dismissIncomeSyncError } = useIncome();
+  const { savings, ready: savingsReady, syncError: savingsSyncError, dismissSyncError: dismissSavingsSyncError } = useSavings();
+
+  useEffect(() => {
+    if (!incomeSyncError) return;
+    const timer = setTimeout(dismissIncomeSyncError, 6000);
+    return () => clearTimeout(timer);
+  }, [incomeSyncError, dismissIncomeSyncError]);
+
+  useEffect(() => {
+    if (!savingsSyncError) return;
+    const timer = setTimeout(dismissSavingsSyncError, 6000);
+    return () => clearTimeout(timer);
+  }, [savingsSyncError, dismissSavingsSyncError]);
 
   const now   = new Date();
   const month = now.getMonth();
@@ -214,6 +227,9 @@ export default function AhorroPage() {
   const target20 = monthIncomeTotal * 0.2;
   const delta    = monthSavingsTotal - target20;
 
+  const incomeErrorMessage   = incomeSyncError   ? t.errors[`${incomeSyncError}Income` as keyof typeof t.errors]   : null;
+  const savingsErrorMessage  = savingsSyncError  ? t.errors[`${savingsSyncError}Saving` as keyof typeof t.errors]  : null;
+
   if (!incomeReady || !savingsReady) {
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: MUTED, fontSize: "0.8rem" }}>
@@ -223,7 +239,10 @@ export default function AhorroPage() {
   }
 
   return (
-    <div className="millys-scroll-hidden" style={{ height: "100%", overflowY: "auto", padding: "28px 20px 32px" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
+      {incomeErrorMessage  && <SyncErrorBanner message={incomeErrorMessage}  onDismiss={dismissIncomeSyncError} />}
+      {savingsErrorMessage && <SyncErrorBanner message={savingsErrorMessage} onDismiss={dismissSavingsSyncError} />}
+      <div className="millys-scroll-hidden" style={{ flex: 1, overflowY: "auto", padding: "28px 20px 32px" }}>
       <div className="max-w-xl md:max-w-none w-full mx-auto flex flex-col gap-5">
 
         {/* Hero — same headline treatment as Home */}
@@ -329,6 +348,7 @@ export default function AhorroPage() {
             </div>
           )}
         </div>
+      </div>
       </div>
     </div>
   );

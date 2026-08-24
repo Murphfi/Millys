@@ -2,6 +2,7 @@ package com.millys.backend.savings;
 
 import com.millys.backend.user.User;
 import com.millys.backend.user.UserRepository;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -13,11 +14,17 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/api/savings")
 @RequiredArgsConstructor
 public class SavingsController {
+
+    // Mirrors SAVINGS_DESTINATIONS in frontend/app/dashboard/lib/savings.tsx — kept as a
+    // fixed list on both sides rather than a database table, since these are just two
+    // known destinations today (see project decision: not worth a table for this).
+    private static final Set<String> KNOWN_DESTINATIONS = Set.of("trade-republic", "cuenta-conjunta");
 
     private final SavingsRepository savingsRepository;
     private final UserRepository    userRepository;
@@ -30,6 +37,9 @@ public class SavingsController {
 
     private void applyRequest(SavingsEntry s, SavingsRequest req, User fallbackOwner) {
         s.setUser(resolveOwner(req.userName(), fallbackOwner));
+        if (!KNOWN_DESTINATIONS.contains(req.destinationCode())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Destino desconocido: " + req.destinationCode());
+        }
         s.setDestinationCode(req.destinationCode());
         s.setDescription(req.description() != null ? req.description() : "");
         s.setAmount(req.amount());
@@ -56,7 +66,7 @@ public class SavingsController {
     }
 
     @PostMapping
-    public ResponseEntity<SavingsResponse> create(Authentication auth, @RequestBody SavingsRequest req) {
+    public ResponseEntity<SavingsResponse> create(Authentication auth, @Valid @RequestBody SavingsRequest req) {
         User caller     = (User) auth.getPrincipal();
         SavingsEntry s  = new SavingsEntry();
         applyRequest(s, req, caller);
@@ -65,7 +75,7 @@ public class SavingsController {
 
     @PutMapping("/{id}")
     @Transactional
-    public ResponseEntity<SavingsResponse> update(@PathVariable Long id, @RequestBody SavingsRequest req) {
+    public ResponseEntity<SavingsResponse> update(@PathVariable Long id, @Valid @RequestBody SavingsRequest req) {
         return savingsRepository.findByIdWithUser(id)
                 .map(s -> {
                     applyRequest(s, req, s.getUser());

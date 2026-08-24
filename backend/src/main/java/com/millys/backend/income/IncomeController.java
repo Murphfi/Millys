@@ -2,6 +2,7 @@ package com.millys.backend.income;
 
 import com.millys.backend.user.User;
 import com.millys.backend.user.UserRepository;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -54,7 +55,7 @@ public class IncomeController {
     }
 
     @PostMapping
-    public ResponseEntity<IncomeResponse> create(Authentication auth, @RequestBody IncomeRequest req) {
+    public ResponseEntity<IncomeResponse> create(Authentication auth, @Valid @RequestBody IncomeRequest req) {
         User caller = (User) auth.getPrincipal();
         Income i    = new Income();
         applyRequest(i, req, caller);
@@ -63,7 +64,7 @@ public class IncomeController {
 
     @PutMapping("/{id}")
     @Transactional
-    public ResponseEntity<IncomeResponse> update(@PathVariable Long id, @RequestBody IncomeRequest req) {
+    public ResponseEntity<IncomeResponse> update(@PathVariable Long id, @Valid @RequestBody IncomeRequest req) {
         return incomeRepository.findByIdWithUser(id)
                 .map(i -> {
                     applyRequest(i, req, i.getUser());

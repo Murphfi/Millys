@@ -2,6 +2,7 @@ package com.millys.backend.expense;
 
 import com.millys.backend.user.User;
 import com.millys.backend.user.UserRepository;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -56,7 +57,7 @@ public class ExpenseController {
     }
 
     @PostMapping
-    public ResponseEntity<ExpenseResponse> create(Authentication auth, @RequestBody ExpenseRequest req) {
+    public ResponseEntity<ExpenseResponse> create(Authentication auth, @Valid @RequestBody ExpenseRequest req) {
         User caller = (User) auth.getPrincipal();
         Expense e   = new Expense();
         applyRequest(e, req, caller);
@@ -65,7 +66,7 @@ public class ExpenseController {
 
     @PutMapping("/{id}")
     @Transactional
-    public ResponseEntity<ExpenseResponse> update(@PathVariable Long id, @RequestBody ExpenseRequest req) {
+    public ResponseEntity<ExpenseResponse> update(@PathVariable Long id, @Valid @RequestBody ExpenseRequest req) {
         return expenseRepository.findByIdWithUser(id)
                 .map(e -> {
                     applyRequest(e, req, e.getUser());
