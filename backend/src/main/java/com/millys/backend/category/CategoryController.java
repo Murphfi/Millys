@@ -26,6 +26,7 @@ public class CategoryController {
         cat.setColor(req.color());
         cat.setDefault(false);
         cat.setNoDescription(req.noDescription() != null && req.noDescription());
+        cat.setFinancingCategory(req.financingCategory() != null && req.financingCategory());
         return categoryRepository.save(cat);
     }
 
@@ -36,6 +37,7 @@ public class CategoryController {
                     cat.setLabel(req.label());
                     cat.setColor(req.color());
                     if (req.noDescription() != null) cat.setNoDescription(req.noDescription());
+                    if (req.financingCategory() != null) cat.setFinancingCategory(req.financingCategory());
                     return ResponseEntity.ok(categoryRepository.save(cat));
                 })
                 .orElse(ResponseEntity.notFound().build());

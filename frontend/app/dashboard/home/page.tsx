@@ -10,8 +10,9 @@ import { useExpenses, type Expense } from "../lib/expenses";
 import { useIncome } from "../lib/income";
 import {
   CategoryBars, getMonthTotal, getMonthComparisonPct, getUserTotals, getPrevMonth, parseExpenseDate,
-  getMonthGrid, toDateKey, todayDate, isSameDay, getCategoryComparison,
+  getMonthGrid, toDateKey, todayDate, isSameDay, getCategoryComparison, getUserColor, sharedOnly,
 } from "../lib/stats";
+import { useCountUp } from "../lib/use-count-up";
 import { ExpenseDialog } from "../add-expense-dialog";
 
 const CHARCOAL = "#2A2720";
@@ -115,19 +116,6 @@ function MonthCalendar({ expenses, month, year, getCat }: {
   );
 }
 
-// Fixed per-person colors (not by rank) so Murphfi/Lilly keep the same segment
-// color every month regardless of who spent more. Unknown names (e.g. Test's
-// seeded "Usuario 1"/"Usuario 2") fall back to the neutral brand tones.
-const USER_COLORS: Record<string, string> = {
-  Murphfi: "#9AB89D", // lighter sage — same token as the sidebar's inactive nav green
-  Lilly:   "#D9A0A8", // muted rose, kept as desaturated as the rest of the palette
-};
-const USER_COLOR_FALLBACK = [SAGE, STONE, MUTED];
-
-function getUserColor(name: string, index: number): string {
-  return USER_COLORS[name] ?? USER_COLOR_FALLBACK[index % USER_COLOR_FALLBACK.length];
-}
-
 /** Stacked bar + legend showing how the month splits between the people spending. */
 function UserSplit({ userTotals, total }: { userTotals: [string, number][]; total: number }) {
   return (
@@ -221,13 +209,22 @@ export default function DashboardHome() {
 
   function getCat(id: string) { return categories.find(c => c.id === id); }
 
-  const monthTotal = useMemo(() => getMonthTotal(expenses, month, year), [expenses, month, year]);
-  const pct        = useMemo(() => getMonthComparisonPct(expenses, month, year), [expenses, month, year]);
+  // Home's whole month view (hero, split, category chart/variation, calendar
+  // dots) is the couple's SHARED picture — a personal expense (Murphfas' own
+  // car payment) shouldn't inflate anyone's part of it. It still shows up in
+  // "Últimos gastos" (that's just an activity log) and in its own card below.
+  const sharedExpenses   = useMemo(() => sharedOnly(expenses), [expenses]);
+  const personalExpenses = useMemo(() => expenses.filter(e => e.shared === false), [expenses]);
+
+  const monthTotal = useMemo(() => getMonthTotal(sharedExpenses, month, year), [sharedExpenses, month, year]);
+  const displayedTotal = useCountUp(monthTotal, `${month}-${year}`);
+  const pct        = useMemo(() => getMonthComparisonPct(sharedExpenses, month, year), [sharedExpenses, month, year]);
   const { month: prevMonth, year: prevYear } = getPrevMonth(month, year);
-  const prevMonthTotal = useMemo(() => getMonthTotal(expenses, prevMonth, prevYear), [expenses, prevMonth, prevYear]);
-  const userTotals = useMemo(() => getUserTotals(expenses, month, year), [expenses, month, year]);
+  const prevMonthTotal = useMemo(() => getMonthTotal(sharedExpenses, prevMonth, prevYear), [sharedExpenses, prevMonth, prevYear]);
+  const userTotals = useMemo(() => getUserTotals(sharedExpenses, month, year), [sharedExpenses, month, year]);
   const monthIncomeTotal = useMemo(() => getMonthTotal(income, month, year), [income, month, year]);
   const incomeUserTotals = useMemo(() => getUserTotals(income, month, year), [income, month, year]);
+  const personalUserTotals = useMemo(() => getUserTotals(personalExpenses, month, year), [personalExpenses, month, year]);
 
   const recent = useMemo(() =>
     expenses
@@ -254,7 +251,7 @@ export default function DashboardHome() {
   }
 
   return (
-    <div className="millys-scroll-hidden" style={{ height: "100%", overflowY: "auto", padding: "28px 20px 32px" }}>
+    <div className="millys-scroll-hidden" style={{ height: "100%", overflowY: "auto", padding: "16px 20px 32px" }}>
       <div className="max-w-xl md:max-w-none w-full mx-auto flex flex-col gap-5">
 
         {/* Hero — deliberately NOT a bordered card like the panels below it (or like
@@ -268,7 +265,7 @@ export default function DashboardHome() {
           <span style={{ ...LABEL_STYLE, fontSize: "1rem", letterSpacing: "0.05em", display: "block", marginBottom: 8 }}>
             {t.calendar.months[month]} {year}
           </span>
-          <Fraunces as="h1" size="clamp(3rem, 6vw, 4.5rem)">{fmtCurrency(monthTotal)}</Fraunces>
+          <Fraunces as="h1" size="clamp(3rem, 6vw, 4.5rem)">{fmtCurrency(displayedTotal)}</Fraunces>
 
           {(pct !== null || projection !== null) && (
             <div className="flex flex-col md:flex-row md:items-center md:justify-center" style={{ marginTop: 16, gap: "10px 32px" }}>
@@ -319,7 +316,7 @@ export default function DashboardHome() {
                     {t.expenses.categoryTitle}
                   </span>
                   <CategoryBars
-                    expenses={expenses}
+                    expenses={sharedExpenses}
                     month={month}
                     year={year}
                     getCat={getCat}
@@ -333,7 +330,7 @@ export default function DashboardHome() {
                   <span style={{ ...LABEL_STYLE, display: "block", marginBottom: 12 }}>
                     {t.home.variation}
                   </span>
-                  <CategoryVariation expenses={expenses} month={month} year={year} getCat={getCat} />
+                  <CategoryVariation expenses={sharedExpenses} month={month} year={year} getCat={getCat} />
                 </div>
               </div>
             )}
@@ -353,7 +350,7 @@ export default function DashboardHome() {
                 <div style={{ color: MUTED, fontSize: "0.8rem", padding: "12px 0" }}>{t.expenses.empty}</div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                  {recent.map(e => {
+                  {recent.map((e, i) => {
                     const cat = getCat(e.categoryId);
                     return (
                       <button
@@ -364,6 +361,8 @@ export default function DashboardHome() {
                           display: "flex", alignItems: "center", gap: 10, width: "100%",
                           padding: "11px 8px", borderRadius: 10, border: "none", background: "transparent",
                           cursor: "pointer", textAlign: "left",
+                          animation: "millys-stagger-in 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both",
+                          animationDelay: `${i * 40}ms`,
                         }}
                         onMouseEnter={(ev) => { ev.currentTarget.style.background = "rgba(42,39,32,0.03)"; }}
                         onMouseLeave={(ev) => { ev.currentTarget.style.background = "transparent"; }}
@@ -390,7 +389,7 @@ export default function DashboardHome() {
               <span style={{ ...LABEL_STYLE, display: "block", marginBottom: 12 }}>
                 {t.expenses.viewCalendar}
               </span>
-              <MonthCalendar expenses={expenses} month={month} year={year} getCat={getCat} />
+              <MonthCalendar expenses={sharedExpenses} month={month} year={year} getCat={getCat} />
             </div>
 
             {/* Ingresos redirect card — Home doesn't duplicate the Ahorro screen,
@@ -416,6 +415,32 @@ export default function DashboardHome() {
                 </div>
               )}
             </Link>
+
+            {/* Gastos personales redirect card — each person's own total (a personal
+                expense has one owner, so these amounts aren't parts of a shared whole
+                the way "Reparto" below is; no proportional bar, just per-person rows). */}
+            {personalUserTotals.length > 0 && (
+              <Link
+                href="/dashboard/expenses?shared=personal"
+                style={{ ...SECTION_STYLE, display: "block", textDecoration: "none", transition: "box-shadow 0.15s ease" }}
+                onMouseEnter={(e) => { e.currentTarget.style.boxShadow = "0 4px 14px rgba(42,39,32,0.09)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.boxShadow = "none"; }}
+              >
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                  <span style={LABEL_STYLE}>{t.home.personalTitle}</span>
+                  <ArrowRight size={13} strokeWidth={2} color={SAGE} />
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {personalUserTotals.map(([name, amount], i) => (
+                    <div key={name} style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+                      <span style={{ width: 6, height: 6, borderRadius: "50%", background: getUserColor(name, i), flexShrink: 0 }} />
+                      <span style={{ fontSize: "0.78rem", color: STONE, flex: 1 }}>{name}</span>
+                      <Fraunces size="1.05rem">{fmtCurrency(amount)}</Fraunces>
+                    </div>
+                  ))}
+                </div>
+              </Link>
+            )}
 
             {userTotals.length > 1 && (
               <div style={SECTION_STYLE}>

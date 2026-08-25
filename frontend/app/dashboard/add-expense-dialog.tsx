@@ -18,9 +18,11 @@ import { useCategories } from "./lib/categories";
 import { useLang, getCategoryLabel } from "./lib/i18n";
 import { useExpenses, type Expense } from "./lib/expenses";
 import { useIncome, type Income } from "./lib/income";
+import { useInstallments } from "./lib/installments";
 import { apiFetch, getCurrentUsername } from "./lib/api";
 import { todayDate, toDateKey } from "./lib/stats";
 import { DatePicker } from "./date-picker";
+import { SegmentedToggle } from "./segmented-toggle";
 
 // ── Design tokens ─────────────────────────────────────────────────────────
 const CHARCOAL = "#2A2720";
@@ -51,10 +53,11 @@ function ExpenseForm({
   onSubmit,
 }: {
   onClose: () => void;
-  initialValues?: Pick<Expense, "categoryId" | "description" | "date" | "amount" | "userName">;
+  initialValues?: Pick<Expense, "categoryId" | "description" | "date" | "amount" | "userName" | "installmentPlanId" | "shared">;
   onSubmit: (data: ExpenseData) => void;
 }) {
   const { categories }                = useCategories();
+  const { installments }              = useInstallments();
   const { t }                         = useLang();
   const currentUser                   = getCurrentUsername();
   const isTest                        = currentUser.toLowerCase() === "test";
@@ -65,6 +68,8 @@ function ExpenseForm({
   const [date, setDate]               = useState(initialValues?.date ?? toDateKey(todayDate()));
   const [userName, setUserName]       = useState(initialValues?.userName ?? currentUser);
   const [users, setUsers]             = useState<string[]>([]);
+  const [installmentPlanId, setInstallmentPlanId] = useState(initialValues?.installmentPlanId ?? null);
+  const [shared, setShared]           = useState(initialValues?.shared ?? true);
 
   // Fetch real user list for non-Test sessions
   useEffect(() => {
@@ -79,28 +84,64 @@ function ExpenseForm({
   const selectedCat = categories.find(c => c.id === categoryId);
   const isChofa     = selectedCat?.noDescription ?? false;
 
+  // Financing plans belonging to whoever this expense is assigned to, offered
+  // only under the category flagged for it (e.g. Suscripciones/Fijos) — a
+  // plan is personal (has one owner), so switching the user resets any pick
+  // that no longer applies, and switching category away clears it too.
+  const isFinancingCategory = selectedCat?.financingCategory ?? false;
+  const ownerPlans = isFinancingCategory ? installments.filter(p => p.userName === userName) : [];
+  function handleUserChange(v: string) {
+    setUserName(v);
+    if (!installments.some(p => p.id === installmentPlanId && p.userName === v)) setInstallmentPlanId(null);
+  }
+  function handleCategoryChange(v: string) {
+    setCategoryId(v);
+    if (!categories.find(c => c.id === v)?.financingCategory) setInstallmentPlanId(null);
+    if (categories.find(c => c.id === v)?.noDescription) setDescription("");
+  }
+
+  // A linked financing plan replaces the description with its own name (e.g.
+  // "Coche") instead of asking for one twice — the plan name already says
+  // what the payment is for.
+  const linkedPlanName = installmentPlanId ? ownerPlans.find(p => p.id === installmentPlanId)?.description : undefined;
+  const hideDescription = isChofa || !!linkedPlanName;
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    onSubmit({ categoryId, description: isChofa ? "" : description, date, amount: parseFloat(amount), userName });
+    const finalDescription = linkedPlanName ?? (isChofa ? "" : description);
+    onSubmit({ categoryId, description: finalDescription, date, amount: parseFloat(amount), userName, installmentPlanId, shared });
     onClose();
   }
 
   return (
     <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 22 }}>
-      {/* Header */}
-      <h2 style={{
-        fontFamily: "var(--font-display), serif",
-        fontStyle: "italic",
-        fontWeight: 300,
-        fontSize: "1.75rem",
-        lineHeight: 1,
-        letterSpacing: "-0.02em",
-        fontVariationSettings: '"SOFT" 100, "WONK" 1',
-        color: CHARCOAL,
-        margin: 0,
-      }}>
-        {isEdit ? t.expense.editTitle : t.expense.title}
-      </h2>
+      {/* Header — title paired with the Compartido/Personal toggle so "who is
+          this for" is answered right away, before category. */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+        <h2 style={{
+          fontFamily: "var(--font-display), serif",
+          fontStyle: "italic",
+          fontWeight: 300,
+          fontSize: "1.75rem",
+          lineHeight: 1,
+          letterSpacing: "-0.02em",
+          fontVariationSettings: '"SOFT" 100, "WONK" 1',
+          color: CHARCOAL,
+          margin: 0,
+        }}>
+          {isEdit ? t.expense.editTitle : t.expense.title}
+        </h2>
+        <div style={{ flexShrink: 0 }}>
+          <SegmentedToggle
+            value={shared ? "shared" : "personal"}
+            onChange={(v) => setShared(v === "shared")}
+            options={[
+              { value: "shared", label: t.expense.sharedShared },
+              { value: "personal", label: t.expense.sharedPersonal },
+            ]}
+          />
+        </div>
+      </div>
 
       {/* Amount */}
       <div style={{ textAlign: "center", padding: "10px 0 4px" }}>
@@ -146,18 +187,15 @@ function ExpenseForm({
         <Label className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: MUTED }}>
           {t.expense.category}
         </Label>
-        <Select value={categoryId} onValueChange={(v) => {
-          setCategoryId(v ?? "");
-          if (categories.find(c => c.id === v)?.noDescription) setDescription("");
-        }}>
+        <Select value={categoryId} onValueChange={(v) => handleCategoryChange(v ?? "")}>
           <SelectTrigger
             className="w-full rounded-none border-x-0 border-t-0 border-b bg-transparent px-0 pb-2 focus-visible:ring-0 millys-input"
             style={{ color: CHARCOAL }}
           >
             {selectedCat ? (
-              <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, overflow: "hidden" }}>
                 <CategoryDot color={selectedCat.color} />
-                {getCategoryLabel(selectedCat, t)}
+                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{getCategoryLabel(selectedCat, t)}</span>
               </span>
             ) : (
               <span style={{ color: MUTED }}>{t.expense.categoryPlaceholder}</span>
@@ -176,8 +214,35 @@ function ExpenseForm({
         </Select>
       </div>
 
-      {/* Description — hidden for categories marked noDescription (e.g. Chofa) */}
-      {!isChofa && (
+      {/* Financing plan — only offered under the category flagged for it
+          (e.g. Suscripciones/Fijos) and when the assigned owner has an active
+          plan. Picking one takes over the description below (the plan's own
+          name already says what the payment is for). */}
+      {ownerPlans.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <Label className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: MUTED }}>
+            {t.expense.installmentPlan}
+          </Label>
+          <Select value={installmentPlanId ?? "none"} onValueChange={(v) => setInstallmentPlanId(v === "none" ? null : v)}>
+            <SelectTrigger
+              className="w-full rounded-none border-x-0 border-t-0 border-b bg-transparent px-0 pb-2 focus-visible:ring-0 millys-input"
+              style={{ color: CHARCOAL }}
+            >
+              {installmentPlanId ? ownerPlans.find(p => p.id === installmentPlanId)?.description : t.expense.installmentPlanNone}
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">{t.expense.installmentPlanNone}</SelectItem>
+              {ownerPlans.map(p => (
+                <SelectItem key={p.id} value={p.id}>{p.description}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      {/* Description — hidden for categories marked noDescription (e.g. Chofa)
+          and whenever a financing plan is linked (its name is used instead) */}
+      {!hideDescription && (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <Label className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: MUTED }}>
             {t.expense.description}
@@ -193,41 +258,43 @@ function ExpenseForm({
         </div>
       )}
 
-      {/* Date */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-        <Label className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: MUTED }}>
-          {t.expense.date}
-        </Label>
-        <DatePicker
-          value={date}
-          onChange={setDate}
-          months={t.calendar.months}
-          days={t.calendar.days}
-          placeholder={t.expense.datePlaceholder}
-        />
-      </div>
-
-      {/* User selector — non-Test users only */}
-      {!isTest && users.length > 1 && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      {/* Date + user — paired the same way; user only appears for non-Test
+          multi-user sessions, in which case Date shrinks to make room. */}
+      <div style={{ display: "flex", gap: 14 }}>
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
           <Label className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: MUTED }}>
-            Usuario
+            {t.expense.date}
           </Label>
-          <Select value={userName} onValueChange={(v) => setUserName(v ?? userName)}>
-            <SelectTrigger
-              className="w-full rounded-none border-x-0 border-t-0 border-b bg-transparent px-0 pb-2 focus-visible:ring-0 millys-input"
-              style={{ color: CHARCOAL }}
-            >
-              {userName}
-            </SelectTrigger>
-            <SelectContent>
-              {users.map(u => (
-                <SelectItem key={u} value={u}>{u}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <DatePicker
+            value={date}
+            onChange={setDate}
+            months={t.calendar.months}
+            days={t.calendar.days}
+            placeholder={t.expense.datePlaceholder}
+          />
         </div>
-      )}
+
+        {!isTest && users.length > 1 && (
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
+            <Label className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: MUTED }}>
+              Usuario
+            </Label>
+            <Select value={userName} onValueChange={(v) => handleUserChange(v ?? userName)}>
+              <SelectTrigger
+                className="w-full rounded-none border-x-0 border-t-0 border-b bg-transparent px-0 pb-2 focus-visible:ring-0 millys-input"
+                style={{ color: CHARCOAL }}
+              >
+                {userName}
+              </SelectTrigger>
+              <SelectContent>
+                {users.map(u => (
+                  <SelectItem key={u} value={u}>{u}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+      </div>
 
       {/* Actions */}
       <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
@@ -465,32 +532,14 @@ function IncomeForm({
 function KindToggle({ kind, onChange }: { kind: "expense" | "income"; onChange: (k: "expense" | "income") => void }) {
   const { t } = useLang();
   return (
-    <div style={{ display: "flex", gap: 6, padding: 4, background: "#F2EBE1", borderRadius: 999, marginBottom: 4 }}>
-      {(["expense", "income"] as const).map(k => {
-        const active = kind === k;
-        return (
-          <button
-            key={k}
-            type="button"
-            onClick={() => onChange(k)}
-            style={{
-              flex: 1,
-              padding: "8px 0",
-              borderRadius: 999,
-              border: "none",
-              background: active ? CHARCOAL : "transparent",
-              color: active ? CARD : "#78726A",
-              fontSize: "0.8rem",
-              fontWeight: active ? 600 : 500,
-              cursor: "pointer",
-              transition: "background 0.15s ease, color 0.15s ease",
-            }}
-          >
-            {k === "expense" ? t.expense.kindExpense : t.expense.kindIncome}
-          </button>
-        );
-      })}
-    </div>
+    <SegmentedToggle
+      value={kind}
+      onChange={onChange}
+      options={[
+        { value: "expense", label: t.expense.kindExpense },
+        { value: "income", label: t.expense.kindIncome },
+      ]}
+    />
   );
 }
 
@@ -503,7 +552,7 @@ export function ExpenseDialog({
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  initialValues?: Pick<Expense, "categoryId" | "description" | "date" | "amount" | "userName">;
+  initialValues?: Pick<Expense, "categoryId" | "description" | "date" | "amount" | "userName" | "installmentPlanId" | "shared">;
   onSubmit: (data: ExpenseData) => void;
 }) {
   return (

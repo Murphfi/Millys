@@ -6,6 +6,7 @@ import { useLang, getDestinationLabel } from "../lib/i18n";
 import { useIncome, type Income } from "../lib/income";
 import { useSavings, SAVINGS_DESTINATIONS, type SavingsEntry } from "../lib/savings";
 import { getMonthTotal, getUserTotals } from "../lib/stats";
+import { useCountUp } from "../lib/use-count-up";
 import { IncomeDialog } from "../add-expense-dialog";
 import { SavingsDialog, AddSavingsButton } from "./add-savings-dialog";
 import { SyncErrorBanner } from "../sync-error-banner";
@@ -54,7 +55,7 @@ function ActionBtn({ icon: Icon, label, hoverColor, hoverBg, onClick }: {
 }
 
 /** One income entry — same shell as MovementRow, no destination so the accent is a fixed sage bar. */
-function IncomeRow({ entry }: { entry: Income }) {
+function IncomeRow({ entry, index }: { entry: Income; index: number }) {
   const { t } = useLang();
   const [hovered, setHovered] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -70,6 +71,8 @@ function IncomeRow({ entry }: { entry: Income }) {
           background: hovered ? "rgba(42,39,32,0.018)" : CARD, overflow: "hidden",
           boxShadow: hovered ? "0 4px 14px rgba(42,39,32,0.09)" : "0 1px 2px rgba(42,39,32,0.04)",
           transition: "box-shadow 0.18s ease, background 0.18s ease",
+          animation: "millys-stagger-in 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both",
+          animationDelay: `${index * 40}ms`,
         }}
       >
         <div style={{ width: 4, flexShrink: 0, background: SAGE }} />
@@ -99,7 +102,7 @@ function IncomeRow({ entry }: { entry: Income }) {
 }
 
 /** One savings movement — click the pencil to edit, same edit-in-place pattern as Gastos' kanban cards. */
-function MovementRow({ entry }: { entry: SavingsEntry }) {
+function MovementRow({ entry, index }: { entry: SavingsEntry; index: number }) {
   const { t } = useLang();
   const [hovered, setHovered] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -117,6 +120,8 @@ function MovementRow({ entry }: { entry: SavingsEntry }) {
           background: hovered ? "rgba(42,39,32,0.018)" : CARD, overflow: "hidden",
           boxShadow: hovered ? "0 4px 14px rgba(42,39,32,0.09)" : "0 1px 2px rgba(42,39,32,0.04)",
           transition: "box-shadow 0.18s ease, background 0.18s ease",
+          animation: "millys-stagger-in 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both",
+          animationDelay: `${index * 40}ms`,
         }}
       >
         <div style={{ width: 4, flexShrink: 0, background: dest?.color ?? MUTED }} />
@@ -155,12 +160,13 @@ function MovementRow({ entry }: { entry: SavingsEntry }) {
 }
 
 /** One 50/30/20 tile — combined amount plus each person's own share of that percentage. */
-function SplitTile({ label, pct, userTotals }: { label: string; pct: number; userTotals: [string, number][] }) {
+function SplitTile({ label, pct, userTotals, trigger }: { label: string; pct: number; userTotals: [string, number][]; trigger: unknown }) {
   const total = userTotals.reduce((s, [, amount]) => s + amount, 0);
+  const displayedAmount = useCountUp(total * pct, trigger);
   return (
     <div className="md:flex-1" style={SECTION_STYLE}>
       <span style={{ ...LABEL_STYLE, display: "block", marginBottom: 10 }}>{label}</span>
-      <Fraunces size="1.4rem">{fmtCurrency(total * pct)}</Fraunces>
+      <Fraunces size="1.4rem">{fmtCurrency(displayedAmount)}</Fraunces>
       {userTotals.length > 1 && (
         <div style={{ display: "flex", flexWrap: "wrap", gap: "3px 14px", marginTop: 10 }}>
           {userTotals.map(([name, amount]) => (
@@ -199,6 +205,7 @@ export default function AhorroPage() {
   // funds (e.g. Murphfi's July paycheck is dated 01/08) rather than the actual pay
   // date — same "this month" filter as everywhere else, no special-casing needed.
   const monthIncomeTotal = useMemo(() => getMonthTotal(income, month, year), [income, month, year]);
+  const displayedIncomeTotal = useCountUp(monthIncomeTotal, `${month}-${year}`);
   const incomeUserTotals = useMemo(() => getUserTotals(income, month, year), [income, month, year]);
   const monthIncome = useMemo(() =>
     income.filter(i => {
@@ -217,6 +224,7 @@ export default function AhorroPage() {
   );
 
   const monthSavingsTotal = useMemo(() => monthSavings.reduce((sum, s) => sum + s.amount, 0), [monthSavings]);
+  const displayedSavingsTotal = useCountUp(monthSavingsTotal, `${month}-${year}`);
 
   const byDestination = useMemo(() => {
     const map: Record<string, number> = {};
@@ -242,7 +250,7 @@ export default function AhorroPage() {
     <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
       {incomeErrorMessage  && <SyncErrorBanner message={incomeErrorMessage}  onDismiss={dismissIncomeSyncError} />}
       {savingsErrorMessage && <SyncErrorBanner message={savingsErrorMessage} onDismiss={dismissSavingsSyncError} />}
-      <div className="millys-scroll-hidden" style={{ flex: 1, overflowY: "auto", padding: "28px 20px 32px" }}>
+      <div className="millys-scroll-hidden" style={{ flex: 1, overflowY: "auto", padding: "16px 20px 32px" }}>
       <div className="max-w-xl md:max-w-none w-full mx-auto flex flex-col gap-5">
 
         {/* Hero — same headline treatment as Home */}
@@ -253,7 +261,7 @@ export default function AhorroPage() {
           <span style={{ ...LABEL_STYLE, fontSize: "1rem", letterSpacing: "0.05em", display: "block", marginBottom: 8 }}>
             {t.calendar.months[month]} {year}
           </span>
-          <Fraunces size="clamp(3rem, 6vw, 4.5rem)">{fmtCurrency(monthIncomeTotal)}</Fraunces>
+          <Fraunces size="clamp(3rem, 6vw, 4.5rem)">{fmtCurrency(displayedIncomeTotal)}</Fraunces>
 
           {incomeUserTotals.length > 1 && (
             <div className="flex flex-wrap" style={{ marginTop: 16, gap: "4px 14px", justifyContent: "center" }}>
@@ -279,7 +287,7 @@ export default function AhorroPage() {
               {monthIncome
                 .slice()
                 .sort((a, b) => (a.date < b.date ? 1 : -1))
-                .map(entry => <IncomeRow key={entry.id} entry={entry} />)}
+                .map((entry, i) => <IncomeRow key={entry.id} entry={entry} index={i} />)}
             </div>
           )}
         </div>
@@ -287,9 +295,9 @@ export default function AhorroPage() {
         {/* 50/30/20 suggested split — needs at least this month's income to mean anything */}
         {monthIncomeTotal > 0 ? (
           <div className="flex flex-col md:flex-row gap-5">
-            <SplitTile label={t.ahorro.needs} pct={0.5} userTotals={incomeUserTotals} />
-            <SplitTile label={t.ahorro.wants} pct={0.3} userTotals={incomeUserTotals} />
-            <SplitTile label={t.ahorro.savingsTarget} pct={0.2} userTotals={incomeUserTotals} />
+            <SplitTile label={t.ahorro.needs} pct={0.5} userTotals={incomeUserTotals} trigger={`${month}-${year}`} />
+            <SplitTile label={t.ahorro.wants} pct={0.3} userTotals={incomeUserTotals} trigger={`${month}-${year}`} />
+            <SplitTile label={t.ahorro.savingsTarget} pct={0.2} userTotals={incomeUserTotals} trigger={`${month}-${year}`} />
           </div>
         ) : (
           <div style={{ textAlign: "center", color: MUTED, fontSize: "0.8rem", padding: "4px 0" }}>
@@ -303,7 +311,7 @@ export default function AhorroPage() {
             {t.ahorro.savingsTotalTitle}
           </span>
           <div className="flex flex-col md:flex-row md:items-end" style={{ gap: 16, marginBottom: 16 }}>
-            <Fraunces size="2rem">{fmtCurrency(monthSavingsTotal)}</Fraunces>
+            <Fraunces size="2rem">{fmtCurrency(displayedSavingsTotal)}</Fraunces>
             {monthIncomeTotal > 0 && (
               <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
                 {delta >= 0
@@ -344,7 +352,7 @@ export default function AhorroPage() {
               {monthSavings
                 .slice()
                 .sort((a, b) => (a.date < b.date ? 1 : -1))
-                .map(entry => <MovementRow key={entry.id} entry={entry} />)}
+                .map((entry, i) => <MovementRow key={entry.id} entry={entry} index={i} />)}
             </div>
           )}
         </div>

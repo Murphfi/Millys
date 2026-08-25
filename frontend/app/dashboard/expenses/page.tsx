@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useMemo, useCallback, Suspense } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useMemo, useCallback, Suspense } from "react";
 import { createPortal } from "react-dom";
 import { useSearchParams } from "next/navigation";
 import { Pencil, Trash2, ChevronLeft, ChevronRight, TrendingUp, TrendingDown } from "lucide-react";
@@ -23,6 +23,7 @@ const CARD     = "#FAF9F7";
 const SAGE     = "#5E7C64";
 
 type ViewMode = "day" | "week" | "month";
+type SharedFilter = "all" | "shared" | "personal";
 
 
 // ── Date helpers ─────────────────────────────────────────────────────────────
@@ -198,21 +199,40 @@ function ViewTabs({ active, onChange }: { active: ViewMode; onChange: (v: ViewMo
     { key: "week",  label: t.expenses.viewWeek },
     { key: "month", label: t.expenses.viewMonth },
   ];
+  const btnRefs = useRef<Map<ViewMode, HTMLButtonElement>>(new Map());
+  const [indicator, setIndicator] = useState<{ left: number; width: number } | null>(null);
+
+  useLayoutEffect(() => {
+    const el = btnRefs.current.get(active);
+    if (el) setIndicator({ left: el.offsetLeft, width: el.offsetWidth });
+  }, [active]);
+
   return (
-    <div style={{ display: "flex", gap: 2, background: "#EEEBE4", borderRadius: 999, padding: 3 }}>
+    <div style={{ position: "relative", display: "flex", gap: 2, background: "#EEEBE4", borderRadius: 999, padding: 3 }}>
+      {indicator && (
+        <div
+          aria-hidden
+          style={{
+            position: "absolute", top: 3, bottom: 3, left: indicator.left, width: indicator.width,
+            background: CARD, borderRadius: 999, boxShadow: "0 1px 3px rgba(42,39,32,0.10)",
+            transition: "left 0.3s cubic-bezier(0.34,1.56,0.64,1), width 0.3s cubic-bezier(0.34,1.56,0.64,1)",
+          }}
+        />
+      )}
       {tabs.map(({ key, label }) => {
         const on = active === key;
         return (
           <button
             key={key}
+            ref={(el) => { if (el) btnRefs.current.set(key, el); }}
             onClick={() => onChange(key)}
             style={{
+              position: "relative", zIndex: 1,
               padding: "4px 14px", borderRadius: 999, border: "none",
-              background: on ? CARD : "transparent",
+              background: "transparent",
               color: on ? CHARCOAL : STONE,
               fontSize: "0.72rem", fontWeight: on ? 600 : 400,
-              cursor: "pointer", transition: "all 0.2s ease",
-              boxShadow: on ? "0 1px 3px rgba(42,39,32,0.10)" : "none",
+              cursor: "pointer", transition: "color 0.2s ease",
               whiteSpace: "nowrap",
               letterSpacing: on ? "0.01em" : "0",
             }}
@@ -282,7 +302,7 @@ function MonthStrip({ selectedDate, setSelectedDate, expenses, bordered = true }
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", borderBottom: bordered ? `1px solid ${BORDER}` : "none", flexShrink: 0 }}>
+    <div style={{ display: "flex", flexDirection: "column", borderBottom: bordered ? `1px solid ${BORDER}` : "none", flexShrink: 0, pointerEvents: "auto" }}>
       {/* Year strip — centered */}
       <div
         className="millys-scroll-hidden"
@@ -306,7 +326,7 @@ function MonthStrip({ selectedDate, setSelectedDate, expenses, bordered = true }
                 padding: "1px 10px",
                 borderRadius: 999,
                 border: "none",
-                background: active ? CHARCOAL : "transparent",
+                background: active ? SAGE : "transparent",
                 color: active ? CARD : MUTED,
                 fontSize: "0.6rem",
                 fontWeight: active ? 700 : 500,
@@ -369,7 +389,7 @@ function MonthStrip({ selectedDate, setSelectedDate, expenses, bordered = true }
                     padding: active ? "5px 18px" : "5px 14px",
                     borderRadius: 999,
                     border: "none",
-                    background: active ? CHARCOAL : isHov ? "#EDE8DF" : "transparent",
+                    background: active ? SAGE : isHov ? "#EDE8DF" : "transparent",
                     // Active: Fraunces. Adjacent: bolder weight. Others: regular.
                     color: active ? CARD : dist === 1 ? CHARCOAL : STONE,
                     fontFamily: active ? "var(--font-display), serif" : "inherit",
@@ -398,13 +418,15 @@ function MonthStrip({ selectedDate, setSelectedDate, expenses, bordered = true }
 
 // ── Month summary (total + category bars) ────────────────────────────────────
 
-function MonthSummary({ expenses, month, year, getCat, selectedCategory, onSelectCategory }: {
+function MonthSummary({ expenses, month, year, getCat, selectedCategory, onSelectCategory, sharedFilter, onSharedFilterChange }: {
   expenses: Expense[];
   month: number;
   year: number;
   getCat: (id: string) => Category | undefined;
   selectedCategory?: string | null;
   onSelectCategory?: (id: string | null) => void;
+  sharedFilter?: SharedFilter;
+  onSharedFilterChange?: (v: SharedFilter) => void;
 }) {
   const { t } = useLang();
   const monthTotal  = useMemo(() => getMonthTotal(expenses, month, year), [expenses, month, year]);
@@ -412,67 +434,108 @@ function MonthSummary({ expenses, month, year, getCat, selectedCategory, onSelec
   const pct         = useMemo(() => getMonthComparisonPct(expenses, month, year), [expenses, month, year]);
   const prevMonth   = getPrevMonth(month, year).month;
 
-  if (monthTotal === 0) return null;
+  // The shared/personal filter can legitimately zero out the total (e.g. no
+  // personal expenses this month) — bail out entirely only when there's no
+  // filter control to fall back on; otherwise keep rendering it so the user
+  // isn't stuck on an empty card with no way back to "Todos".
+  if (monthTotal === 0 && !onSharedFilterChange) return null;
 
   // Down = calm sage (spending less isn't inherently "good", just gentler framing).
   // Up = neutral stone, never red — this isn't an alert, just context.
 
   return (
     <>
-      <span style={{ fontSize: "0.6rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: MUTED, display: "block", marginBottom: 5 }}>
-        {t.expenses.total}
-      </span>
-      <Fraunces size="1.4rem">{fmtCurrency(monthTotal)}</Fraunces>
-      {pct !== null && (
-        <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 6 }}>
-          {pct <= 0
-            ? <TrendingDown size={12} strokeWidth={2} color={SAGE} />
-            : <TrendingUp size={12} strokeWidth={2} color={STONE} />}
-          <span style={{ fontSize: "0.68rem", fontWeight: 600, color: pct <= 0 ? SAGE : STONE }}>
-            {pct > 0 ? "+" : ""}{Math.round(pct)}%
+      {monthTotal > 0 && (
+        <>
+          <span style={{ fontSize: "0.6rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: MUTED, display: "block", marginBottom: 5 }}>
+            {t.expenses.total}
           </span>
-          <span style={{ fontSize: "0.68rem", color: MUTED }}>
-            vs {t.calendar.months[prevMonth]}
-          </span>
+          <Fraunces size="1.4rem">{fmtCurrency(monthTotal)}</Fraunces>
+          {pct !== null && (
+            <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 6 }}>
+              {pct <= 0
+                ? <TrendingDown size={12} strokeWidth={2} color={SAGE} />
+                : <TrendingUp size={12} strokeWidth={2} color={STONE} />}
+              <span style={{ fontSize: "0.68rem", fontWeight: 600, color: pct <= 0 ? SAGE : STONE }}>
+                {pct > 0 ? "+" : ""}{Math.round(pct)}%
+              </span>
+              <span style={{ fontSize: "0.68rem", color: MUTED }}>
+                vs {t.calendar.months[prevMonth]}
+              </span>
+            </div>
+          )}
+          {userTotals.length > 1 && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "3px 10px", marginTop: 8 }}>
+              {userTotals.map(([name, amount]) => (
+                <span key={name} style={{ display: "inline-flex", alignItems: "baseline", gap: 5, fontSize: "0.68rem", color: STONE, whiteSpace: "nowrap" }}>
+                  {name}
+                  <span style={{ color: CHARCOAL, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{fmtCurrency(amount)}</span>
+                </span>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      {monthTotal === 0 && onSharedFilterChange && (
+        <div style={{ fontSize: "0.75rem", color: MUTED }}>{t.expenses.empty}</div>
+      )}
+
+      {onSharedFilterChange && (
+        <div style={{ display: "flex", gap: 4, marginTop: 16 }}>
+          {(["all", "shared", "personal"] as const).map(v => {
+            const active = (sharedFilter ?? "all") === v;
+            return (
+              <button
+                key={v}
+                onClick={() => onSharedFilterChange(v)}
+                style={{
+                  padding: "4px 10px", borderRadius: 999, border: `1px solid ${active ? SAGE : BORDER}`,
+                  background: active ? SAGE : "transparent", color: active ? CARD : STONE,
+                  fontSize: "0.62rem", fontWeight: active ? 700 : 500, cursor: "pointer",
+                  transition: "background 0.15s ease, color 0.15s ease, border-color 0.15s ease",
+                }}
+              >
+                {v === "all" ? t.expenses.sharedFilterAll : v === "shared" ? t.expenses.sharedFilterShared : t.expenses.sharedFilterPersonal}
+              </button>
+            );
+          })}
         </div>
       )}
-      {userTotals.length > 1 && (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "3px 10px", marginTop: 8 }}>
-          {userTotals.map(([name, amount]) => (
-            <span key={name} style={{ display: "inline-flex", alignItems: "baseline", gap: 5, fontSize: "0.68rem", color: STONE, whiteSpace: "nowrap" }}>
-              {name}
-              <span style={{ color: CHARCOAL, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{fmtCurrency(amount)}</span>
+
+      {monthTotal > 0 && (
+        <>
+          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginTop: 16, marginBottom: 8 }}>
+            <span style={{ fontSize: "0.6rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: MUTED }}>
+              {t.expenses.categoryTitle}
             </span>
-          ))}
-        </div>
+            {selectedCategory != null && (
+              <button
+                onClick={() => onSelectCategory?.(null)}
+                style={{ background: "transparent", border: "none", cursor: "pointer", padding: 0, fontSize: "0.6rem", fontWeight: 600, color: SAGE, textDecoration: "underline", textUnderlineOffset: 2 }}
+              >
+                {t.expenses.clearFilter}
+              </button>
+            )}
+          </div>
+          <CategoryBars expenses={expenses} month={month} year={year} getCat={getCat} selected={selectedCategory} onSelect={onSelectCategory} />
+        </>
       )}
-      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginTop: 16, marginBottom: 8 }}>
-        <span style={{ fontSize: "0.6rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: MUTED }}>
-          {t.expenses.categoryTitle}
-        </span>
-        {selectedCategory != null && (
-          <button
-            onClick={() => onSelectCategory?.(null)}
-            style={{ background: "transparent", border: "none", cursor: "pointer", padding: 0, fontSize: "0.6rem", fontWeight: 600, color: SAGE, textDecoration: "underline", textUnderlineOffset: 2 }}
-          >
-            {t.expenses.clearFilter}
-          </button>
-        )}
-      </div>
-      <CategoryBars expenses={expenses} month={month} year={year} getCat={getCat} selected={selectedCategory} onSelect={onSelectCategory} />
     </>
   );
 }
 
 // ── Mini calendar (right panel) ───────────────────────────────────────────────
 
-function MiniCalendar({ selectedDate, setSelectedDate, expenses, getCat, categoryFilter, onCategoryFilterChange }: {
+function MiniCalendar({ selectedDate, setSelectedDate, expenses, getCat, categoryFilter, onCategoryFilterChange, sharedFilter, onSharedFilterChange }: {
   selectedDate: Date;
   setSelectedDate: (d: Date) => void;
   expenses: Expense[];
   getCat: (id: string) => Category | undefined;
   categoryFilter?: string | null;
   onCategoryFilterChange?: (id: string | null) => void;
+  sharedFilter?: SharedFilter;
+  onSharedFilterChange?: (v: SharedFilter) => void;
 }) {
   const { t } = useLang();
 
@@ -526,7 +589,7 @@ function MiniCalendar({ selectedDate, setSelectedDate, expenses, getCat, categor
                 padding: "4px 1px 2px", borderRadius: 6,
                 border: isToday && !isSel ? "1.5px solid rgba(42,39,32,0.20)" : "1.5px solid transparent",
                 cursor: "pointer",
-                background: isSel ? CHARCOAL : "transparent",
+                background: isSel ? SAGE : "transparent",
                 color: isSel ? "#FAF9F7" : inMonth ? CHARCOAL : MUTED,
                 opacity: inMonth ? 1 : 0.3,
                 transition: "background 0.12s, border-color 0.12s",
@@ -551,7 +614,7 @@ function MiniCalendar({ selectedDate, setSelectedDate, expenses, getCat, categor
 
       {/* Desktop-only: total + category bars */}
       <div className="hidden md:block" style={{ marginTop: 4, paddingTop: 12, borderTop: `1px solid ${BORDER}` }}>
-        <MonthSummary expenses={expenses} month={month} year={year} getCat={getCat} selectedCategory={categoryFilter} onSelectCategory={onCategoryFilterChange} />
+        <MonthSummary expenses={expenses} month={month} year={year} getCat={getCat} selectedCategory={categoryFilter} onSelectCategory={onCategoryFilterChange} sharedFilter={sharedFilter} onSharedFilterChange={onSharedFilterChange} />
       </div>
     </div>
   );
@@ -787,6 +850,10 @@ function ExpensesPageInner() {
     deepLinkedView && ["day", "week", "month"].includes(deepLinkedView) ? deepLinkedView : "month",
   );
   const [categoryFilter, setCategoryFilter] = useState<string | null>(() => searchParams.get("category"));
+  const [sharedFilter, setSharedFilter] = useState<SharedFilter>(() => {
+    const v = searchParams.get("shared");
+    return v === "shared" || v === "personal" ? v : "all";
+  });
   const [selectedDate, setSelectedDate] = useState(() => {
     if (deepLinkedDate) {
       const parts = deepLinkedDate.split("-").map(Number);
@@ -863,10 +930,14 @@ function ExpensesPageInner() {
 
   function getCat(id: string) { return categories.find(c => c.id === id); }
 
-  // Category filter narrows the expense LIST only — the calendar dots and the
-  // category bars themselves keep showing the full month, so you can still see
-  // what you'd be switching to and clear the filter without losing context.
-  const listExpenses = categoryFilter ? expenses.filter(e => e.categoryId === categoryFilter) : expenses;
+  // The category filter narrows the visible LIST only — the sidebar total and
+  // category chart keep showing every category so you can still see what
+  // you'd be switching to. The shared/personal filter is different: since it
+  // changes what "the total" even means (shared math vs. one person's own
+  // spend), it recomputes the sidebar (total, split, category chart) too.
+  const bySharedFilter = (e: Expense) => sharedFilter === "all" || (sharedFilter === "shared" ? e.shared !== false : e.shared === false);
+  const summaryExpenses = expenses.filter(bySharedFilter);
+  const listExpenses = summaryExpenses.filter(e => !categoryFilter || e.categoryId === categoryFilter);
 
   const shared = { expenses: listExpenses, selectedDate, setSelectedDate: updateDate, getCat };
 
@@ -903,7 +974,7 @@ function ExpensesPageInner() {
           </div>
           {/* Mobile-only: total + bars after the expense list */}
           <div className="md:hidden millys-mobile-card" style={{ flexShrink: 0, padding: "14px 16px 20px" }}>
-            <MonthSummary expenses={expenses} month={selectedDate.getMonth()} year={selectedDate.getFullYear()} getCat={getCat} selectedCategory={categoryFilter} onSelectCategory={setCategoryFilter} />
+            <MonthSummary expenses={summaryExpenses} month={selectedDate.getMonth()} year={selectedDate.getFullYear()} getCat={getCat} selectedCategory={categoryFilter} onSelectCategory={setCategoryFilter} sharedFilter={sharedFilter} onSharedFilterChange={setSharedFilter} />
           </div>
         </div>
 
@@ -944,7 +1015,7 @@ function ExpensesPageInner() {
           <div style={{ flexShrink: 0, display: "flex", justifyContent: "center", padding: "10px 16px 9px", borderBottom: `1px solid ${BORDER}` }}>
             <ViewTabs active={viewMode} onChange={updateView} />
           </div>
-          <MiniCalendar selectedDate={selectedDate} setSelectedDate={updateDate} expenses={expenses} getCat={getCat} categoryFilter={categoryFilter} onCategoryFilterChange={setCategoryFilter} />
+          <MiniCalendar selectedDate={selectedDate} setSelectedDate={updateDate} expenses={summaryExpenses} getCat={getCat} categoryFilter={categoryFilter} onCategoryFilterChange={setCategoryFilter} sharedFilter={sharedFilter} onSharedFilterChange={setSharedFilter} />
         </div>
       </div>
     </div>

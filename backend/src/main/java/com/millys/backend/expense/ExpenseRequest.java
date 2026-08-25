@@ -12,5 +12,7 @@ public record ExpenseRequest(
         @Size(max = 200, message = "La descripción es demasiado larga") String description,
         @NotNull @DecimalMin(value = "0.01", message = "El importe debe ser mayor que 0") BigDecimal amount,
         @NotBlank(message = "La fecha es obligatoria") String date,
-        String userName
+        String userName,
+        Long installmentPlanId,
+        Boolean shared
 ) {}

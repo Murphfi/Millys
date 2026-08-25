@@ -33,6 +33,12 @@ public class Category {
     @Column(name = "no_description", nullable = false)
     private boolean noDescription;
 
+    // Marks the category where financing-plan payments live (e.g. Suscripciones/
+    // Fijos) — the expense dialog only offers the "Financiación" link when this
+    // category is selected, instead of a hardcoded category id/code.
+    @Column(name = "financing_category", nullable = false)
+    private boolean financingCategory;
+
     @Column(name = "created_at", nullable = false, insertable = false, updatable = false)
     private OffsetDateTime createdAt;
 }

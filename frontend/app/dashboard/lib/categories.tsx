@@ -9,6 +9,7 @@ export type Category = {
   color: string;
   dbId?: number;         // numeric DB id, populated after syncing with the API
   noDescription?: boolean; // hide the description field for this category (e.g. Chofa)
+  financingCategory?: boolean; // the expense dialog offers "Financiación" only for this category
 };
 
 // Increment this when DEFAULT_CATEGORIES changes to invalidate stale localStorage
@@ -22,7 +23,7 @@ export const DEFAULT_CATEGORIES: Category[] = [
   { id: "chofa",   label: "Chofa",                color: "#7A96B0", noDescription: true },
   { id: "michis",  label: "Michis",               color: "#7A96B0" },
   { id: "ocio",    label: "Ocio",                 color: "#A78BFA" },
-  { id: "susfij",  label: "Suscripciones/Fijos",  color: "#9B8DC4" },
+  { id: "susfij",  label: "Suscripciones/Fijos",  color: "#9B8DC4", financingCategory: true },
   { id: "otros",   label: "Otros",                color: "#A09890" },
 ];
 
@@ -41,13 +42,14 @@ type ApiCategory = {
   color: string;
   default: boolean;
   noDescription: boolean;
+  financingCategory: boolean;
 };
 
 function mapApi(api: ApiCategory): Category {
-  return { id: api.code, label: api.label, color: api.color, dbId: api.id, noDescription: api.noDescription };
+  return { id: api.code, label: api.label, color: api.color, dbId: api.id, noDescription: api.noDescription, financingCategory: api.financingCategory };
 }
 
-type CategoryPayload = { code: string; label: string; color: string; noDescription: boolean };
+type CategoryPayload = { code: string; label: string; color: string; noDescription: boolean; financingCategory: boolean };
 
 function makeCode(label: string): string {
   return label.toLowerCase().replace(/\s+/g, "_") + "_" + Date.now();
@@ -57,8 +59,8 @@ function makeCode(label: string): string {
 
 export type SyncErrorAction = "add" | "update" | "delete";
 
-type NewCategory = { label: string; color: string; noDescription?: boolean };
-type CategoryEdit = { label: string; color: string; noDescription?: boolean };
+type NewCategory = { label: string; color: string; noDescription?: boolean; financingCategory?: boolean };
+type CategoryEdit = { label: string; color: string; noDescription?: boolean; financingCategory?: boolean };
 
 type CategoriesCtx = {
   categories: Category[];
@@ -125,10 +127,10 @@ export function CategoriesProvider({ children }: { children: React.ReactNode }) 
   const addCategory = useCallback((data: NewCategory) => {
     const code = makeCode(data.label);
     if (test.current) {
-      setCategories(prev => [...prev, { id: code, label: data.label, color: data.color, noDescription: data.noDescription }]);
+      setCategories(prev => [...prev, { id: code, label: data.label, color: data.color, noDescription: data.noDescription, financingCategory: data.financingCategory }]);
       return;
     }
-    const payload: CategoryPayload = { code, label: data.label, color: data.color, noDescription: !!data.noDescription };
+    const payload: CategoryPayload = { code, label: data.label, color: data.color, noDescription: !!data.noDescription, financingCategory: !!data.financingCategory };
     apiFetch("/api/categories", { method: "POST", body: JSON.stringify(payload) })
       .then(r => { if (!r.ok) throw new Error(); return r.json(); })
       .then((created: ApiCategory) => setCategories(prev => [...prev, mapApi(created)]))
@@ -145,7 +147,7 @@ export function CategoriesProvider({ children }: { children: React.ReactNode }) 
     if (test.current || !dbId) return;
     apiFetch(`/api/categories/${dbId}`, {
       method: "PUT",
-      body: JSON.stringify({ code: id, label: data.label, color: data.color, noDescription: !!data.noDescription }),
+      body: JSON.stringify({ code: id, label: data.label, color: data.color, noDescription: !!data.noDescription, financingCategory: !!data.financingCategory }),
     })
       .then(r => { if (!r.ok) throw new Error(); })
       .catch(() => { setCategories(rollback); setSyncError("update"); });

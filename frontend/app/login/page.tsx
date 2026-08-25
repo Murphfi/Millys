@@ -13,6 +13,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { LoginTransitionOverlay } from "./transition-overlay";
+
+// After this long without a response, assume Render's free tier is cold-starting
+// the backend and swap the overlay message instead of leaving the user guessing.
+const COLD_START_THRESHOLD_MS = 2500;
+// Overlay stays mounted at least this long so a fast login doesn't just flash.
+const OVERLAY_MIN_SHOW_MS = 450;
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
@@ -191,6 +198,8 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [overlayPhase, setOverlayPhase] = useState<"hidden" | "in" | "out">("hidden");
+  const [coldStart, setColdStart] = useState(false);
   // null = not yet determined (avoids a hydration mismatch); set once on mount.
   // Gates which card mounts so the form (and its ids) exist exactly once instead of
   // duplicated across mobile/desktop copies hidden with CSS.
@@ -204,28 +213,44 @@ export default function LoginPage() {
     return () => mq.removeEventListener("change", onChange);
   }, []);
 
+  function dismissOverlay() {
+    setOverlayPhase("out");
+    setTimeout(() => setOverlayPhase("hidden"), 280);
+  }
+
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
     setLoading(true);
+    setColdStart(false);
+    setOverlayPhase("in");
+    const start = Date.now();
+    const coldTimer = setTimeout(() => setColdStart(true), COLD_START_THRESHOLD_MS);
     try {
       const res = await fetch(`${API_URL}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
       });
+      clearTimeout(coldTimer);
       if (res.ok) {
         const data = await res.json();
         const token: string | undefined = data?.token;
-        if (!token) { setError("Error inesperado del servidor"); return; }
+        if (!token) { setError("Error inesperado del servidor"); dismissOverlay(); return; }
         const storage = rememberMe ? localStorage : sessionStorage;
         storage.setItem("token", token);
+        const remaining = OVERLAY_MIN_SHOW_MS - (Date.now() - start);
+        if (remaining > 0) await new Promise((r) => setTimeout(r, remaining));
         router.push("/dashboard");
+        return; // keep the overlay mounted through the navigation instead of dismissing it
       } else {
         setError("Usuario o contraseña incorrectos");
+        dismissOverlay();
       }
     } catch {
+      clearTimeout(coldTimer);
       setError("No se pudo conectar con el servidor");
+      dismissOverlay();
     } finally {
       setLoading(false);
     }
@@ -404,6 +429,10 @@ export default function LoginPage() {
           {formContent}
         </div>
       </div>
+      )}
+
+      {overlayPhase !== "hidden" && (
+        <LoginTransitionOverlay phase={overlayPhase} coldStart={coldStart} />
       )}
     </div>
   );

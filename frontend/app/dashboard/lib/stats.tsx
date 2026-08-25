@@ -42,6 +42,17 @@ export function getMonthGrid(year: number, month: number): Date[] {
   return grid[35].getMonth() !== month ? grid.slice(0, 35) : grid;
 }
 
+// A personal expense (shared === false) counts only in its owner's own total —
+// call sites that compute the couple's split/comparison/year totals (Home,
+// Global) filter through this first. Gastos itself shows everything raw, so
+// it deliberately does NOT filter through this by default.
+export function sharedOnly(expenses: Expense[]): Expense[] {
+  // !== false (not a plain truthy check) so records missing the field entirely
+  // — e.g. Test-user localStorage saved before `shared` existed — default to
+  // shared, matching the backend column's own DEFAULT TRUE.
+  return expenses.filter(e => e.shared !== false);
+}
+
 export function getMonthTotal(items: { amount: number; date: string }[], month: number, year: number): number {
   return items.filter(e => inMonth(e, month, year)).reduce((s, e) => s + e.amount, 0);
 }
@@ -59,24 +70,57 @@ export function getMonthComparisonPct(expenses: Expense[], month: number, year: 
   return ((total - prevTotal) / prevTotal) * 100;
 }
 
+const CHARCOAL = "#2A2720";
+const STONE    = "#78726A";
+const MUTED    = "#A09890";
+
 export function getUserTotals(items: { userName: string; amount: number; date: string }[], month: number, year: number): [string, number][] {
   const map: Record<string, number> = {};
   items.filter(e => inMonth(e, month, year)).forEach(e => { map[e.userName] = (map[e.userName] ?? 0) + e.amount; });
   return Object.entries(map).sort((a, b) => b[1] - a[1]);
 }
 
+function inYear(e: { date: string }, year: number): boolean {
+  return parseExpenseDate(e.date).getFullYear() === year;
+}
+
+export function getYearTotal(items: { amount: number; date: string }[], year: number): number {
+  return items.filter(e => inYear(e, year)).reduce((s, e) => s + e.amount, 0);
+}
+
+/** Percent change vs. the previous year, or null when there's nothing to compare against. */
+export function getYearComparisonPct(items: { amount: number; date: string }[], year: number): number | null {
+  const prevTotal = getYearTotal(items, year - 1);
+  if (prevTotal <= 0) return null;
+  const total = getYearTotal(items, year);
+  return ((total - prevTotal) / prevTotal) * 100;
+}
+
+// Fixed per-person colors (not by rank) so Murphfi/Lilly keep the same segment
+// color everywhere regardless of who spent more. Unknown names (e.g. Test's
+// seeded "Usuario 1"/"Usuario 2") fall back to the neutral brand tones. Shared
+// between Home's "Reparto por persona" and Global's charts so both stay in sync.
+export const USER_COLORS: Record<string, string> = {
+  Murphfi: "#9AB89D", // lighter sage — same token as the sidebar's inactive nav green
+  Lilly:   "#D9A0A8", // muted rose, kept as desaturated as the rest of the palette
+};
+const USER_COLOR_FALLBACK = ["#5E7C64", STONE, MUTED];
+
+export function getUserColor(name: string, index: number): string {
+  return USER_COLORS[name] ?? USER_COLOR_FALLBACK[index % USER_COLOR_FALLBACK.length];
+}
+
 export type CategoryEntry = { id: string; color: string; label: string; amount: number };
 
-export function getCategoryTotals(
+function aggregateCategoryTotals(
   expenses: Expense[],
-  month: number,
-  year: number,
+  predicate: (e: Expense) => boolean,
   getCat: (id: string) => Category | undefined,
   t: ReturnType<typeof useLang>["t"],
   fallbackColor: string,
 ): CategoryEntry[] {
   const map: Record<string, CategoryEntry> = {};
-  expenses.filter(e => inMonth(e, month, year)).forEach(e => {
+  expenses.filter(predicate).forEach(e => {
     const cat = getCat(e.categoryId);
     map[e.categoryId] ??= {
       id: e.categoryId,
@@ -87,6 +131,27 @@ export function getCategoryTotals(
     map[e.categoryId].amount += e.amount;
   });
   return Object.values(map).sort((a, b) => b.amount - a.amount);
+}
+
+export function getCategoryTotals(
+  expenses: Expense[],
+  month: number,
+  year: number,
+  getCat: (id: string) => Category | undefined,
+  t: ReturnType<typeof useLang>["t"],
+  fallbackColor: string,
+): CategoryEntry[] {
+  return aggregateCategoryTotals(expenses, e => inMonth(e, month, year), getCat, t, fallbackColor);
+}
+
+export function getYearCategoryTotals(
+  expenses: Expense[],
+  year: number,
+  getCat: (id: string) => Category | undefined,
+  t: ReturnType<typeof useLang>["t"],
+  fallbackColor: string,
+): CategoryEntry[] {
+  return aggregateCategoryTotals(expenses, e => inYear(e, year), getCat, t, fallbackColor);
 }
 
 function fmtCurrency(n: number): string {
@@ -118,10 +183,6 @@ export function getCategoryComparison(
     return { ...e, prevAmount, pctChange };
   });
 }
-
-const CHARCOAL = "#2A2720";
-const STONE    = "#78726A";
-const MUTED    = "#A09890";
 
 /**
  * Horizontal bar-per-category breakdown, sorted by spend descending with the

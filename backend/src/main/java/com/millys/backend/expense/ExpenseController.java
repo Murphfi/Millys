@@ -1,5 +1,7 @@
 package com.millys.backend.expense;
 
+import com.millys.backend.installment.InstallmentPlan;
+import com.millys.backend.installment.InstallmentPlanRepository;
 import com.millys.backend.user.User;
 import com.millys.backend.user.UserRepository;
 import jakarta.validation.Valid;
@@ -20,13 +22,20 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class ExpenseController {
 
-    private final ExpenseRepository expenseRepository;
-    private final UserRepository    userRepository;
+    private final ExpenseRepository         expenseRepository;
+    private final UserRepository            userRepository;
+    private final InstallmentPlanRepository installmentPlanRepository;
 
     private User resolveOwner(String requestedName, User fallback) {
         if (requestedName == null || requestedName.isBlank()) return fallback;
         return userRepository.findByNombre(requestedName)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Usuario desconocido: " + requestedName));
+    }
+
+    private InstallmentPlan resolveInstallmentPlan(Long id) {
+        if (id == null) return null;
+        return installmentPlanRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Financiación desconocida: " + id));
     }
 
     private void applyRequest(Expense e, ExpenseRequest req, User fallbackOwner) {
@@ -35,6 +44,8 @@ public class ExpenseController {
         e.setDescription(req.description() != null ? req.description() : "");
         e.setAmount(req.amount());
         e.setDate(LocalDate.parse(req.date()));
+        e.setInstallmentPlan(resolveInstallmentPlan(req.installmentPlanId()));
+        e.setShared(req.shared() != null ? req.shared() : true);
     }
 
     private ExpenseResponse toResponse(Expense e) {
@@ -44,7 +55,9 @@ public class ExpenseController {
                 e.getDescription(),
                 e.getAmount(),
                 e.getDate().toString(),
-                e.getUser().getNombre()
+                e.getUser().getNombre(),
+                e.getInstallmentPlan() != null ? e.getInstallmentPlan().getId() : null,
+                e.isShared()
         );
     }
 

@@ -10,6 +10,7 @@ import { CategoriesProvider } from "./lib/categories";
 import { ExpensesProvider } from "./lib/expenses";
 import { IncomeProvider } from "./lib/income";
 import { SavingsProvider } from "./lib/savings";
+import { InstallmentsProvider } from "./lib/installments";
 import { TopBarSlotContext } from "./lib/topbar-slot";
 
 const SAGE     = "#5E7C64";
@@ -188,9 +189,14 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
                   height (not min-height) so the row is identical on every page —
                   a height that only grew for Gastos made the button/avatar jump
                   up and down when switching pages. */}
-              <header style={{ display: "flex", alignItems: "center", gap: 16, padding: "0 24px", height: 84, flexShrink: 0 }}>
-                <div ref={setTopBarSlot} style={{ flex: 1, minWidth: 0 }} />
-                <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+              <header style={{ display: "flex", alignItems: "center", padding: "0 24px", height: 84, flexShrink: 0, position: "relative" }}>
+                {/* Slot spans the full header width and centers its content against the
+                    header's true center — matching the centered hero/chart content below —
+                    instead of centering within the leftover space next to the cluster, which
+                    skewed it left. pointerEvents:none lets clicks fall through to the cluster;
+                    portaled content (YearStrip, MonthStrip) re-enables it on its own root. */}
+                <div ref={setTopBarSlot} style={{ position: "absolute", top: 0, bottom: 0, left: 0, right: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }} />
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0, marginLeft: "auto", position: "relative" }}>
                   <AddExpenseButton />
                   <div style={{ width: 26, height: 26, borderRadius: "50%", background: "#EDE8DF", border: "1px solid #DDD7CC", display: "flex", alignItems: "center", justifyContent: "center", color: STONE, fontSize: 10, fontWeight: 700, flexShrink: 0 }}>
                     {username ? username[0].toUpperCase() : "·"}
@@ -217,7 +223,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <ExpensesProvider>
           <IncomeProvider>
             <SavingsProvider>
-              <DashboardContent>{children}</DashboardContent>
+              <InstallmentsProvider>
+                <DashboardContent>{children}</DashboardContent>
+              </InstallmentsProvider>
             </SavingsProvider>
           </IncomeProvider>
         </ExpensesProvider>
