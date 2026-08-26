@@ -19,7 +19,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Millys",
+  title: { default: "Millys", template: "%s · Millys" },
   description: "Gestor de gastos mensuales en pareja",
 };
 
