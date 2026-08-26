@@ -126,7 +126,7 @@
   .millys-input:focus,
   .millys-input:focus-visible,
   .millys-input[data-state="open"] {
-    border-color: #A78BFA;
+    border-color: #5E7C64;
   }
 
   /* ── RGB sliders (color picker) ── */
@@ -260,7 +260,7 @@
     }
   }
 
-  /* Login right panel — responsive horizontal padding */
+  /* Login card — responsive padding */
   .millys-login-panel {
     padding: 32px 28px;
   }
@@ -314,6 +314,20 @@
   84%       { transform: scale(1.05, 0.96); }
 }
 
+/* "Night Ledger" faint ruled-line texture — shared by the login page and its
+   own transition overlay so the two screens read as one continuous world.
+   Set --ledger-color per usage (differs slightly: charcoal-on-sand for the
+   login page, cream-on-sage for the overlay). */
+.millys-ledger-lines {
+  background-image: repeating-linear-gradient(
+    180deg,
+    var(--ledger-color) 0px,
+    var(--ledger-color) 1px,
+    transparent 1px,
+    transparent 28px
+  );
+}
+
 /* Month strip active pill — spring pop */
 @keyframes millys-month-pop {
   0%   { transform: scale(0.80); }
@@ -345,6 +359,18 @@
   100% { opacity: 1; transform: translateY(0); }
 }
 
+/* ── Login → dashboard reveal (circle expanding from the submit button) ── */
+@keyframes millys-reveal-in {
+  from { clip-path: circle(26px at var(--reveal-x) var(--reveal-y)); }
+  to   { clip-path: circle(var(--reveal-r) at var(--reveal-x) var(--reveal-y)); }
+}
+
+/* Dashboard arrival — a soft "zoom out to settle" on first mount, mirroring
+   the login overlay's zoom-in so the two ends of the journey rhyme. */
+@keyframes millys-dashboard-in {
+  from { opacity: 0; transform: scale(1.035); }
+  to   { opacity: 1; transform: scale(1); }
+}
 
 @media (prefers-reduced-motion: reduce) {
   *,

@@ -12,6 +12,9 @@ frontend/!.env.example
 # Claude Code (local tooling, not project code)
 .claude/
 
+# playwright-cli scratch output (snapshots/console logs from ad-hoc testing)
+.playwright-cli/
+
 # IDE
 .idea/
 *.iml

@@ -12,6 +12,7 @@ import { IncomeProvider } from "./lib/income";
 import { SavingsProvider } from "./lib/savings";
 import { InstallmentsProvider } from "./lib/installments";
 import { TopBarSlotContext } from "./lib/topbar-slot";
+import { NAV_BOTTOM_GAP, NAV_HEIGHT, NAV_ICON_POP, NAV_Z_INDEX, CONTENT_RESERVE } from "./lib/nav-layout";
 
 const SAGE     = "#5E7C64";
 const CARD     = "#FAF9F7";
@@ -49,6 +50,14 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   const [isDesktop, setIsDesktop] = useState<boolean | null>(null);
   // Desktop topbar portal target — see lib/topbar-slot.tsx
   const [topBarSlot, setTopBarSlot] = useState<HTMLDivElement | null>(null);
+  // The mobile/desktop branches are structurally different JSX, so toggling
+  // isDesktop unmounts one and mounts the other — without this, the entrance
+  // animation below would replay on every breakpoint crossing (resizing
+  // across 768px, rotating a tablet) instead of just once. Flipped by
+  // onAnimationEnd (not a timer) so it only turns off once the animation has
+  // actually finished playing — flipping it earlier would cut the animation
+  // short by switching its `animation` value away mid-flight.
+  const [playEntrance, setPlayEntrance] = useState(true);
 
   // Build translated nav items on each render
   const navItems = NAV_ROUTES.map(r => ({ ...r, label: t.nav[r.key] }));
@@ -83,8 +92,17 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   if (!isDesktop) {
     return (
       <div className="flex flex-col" style={{ minHeight: "100dvh", background: SAGE }}>
-        {/* White content card */}
-        <div style={{ flex: 1, background: CARD, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        {/* White content card — animated here, not on the outer wrapper: a
+            `transform` (even a settled `scale(1)`) on an ancestor of the
+            fixed bottom nav below would give it a new containing block and
+            break its `position: fixed` against the viewport. */}
+        <div style={{
+          flex: 1, background: CARD, display: "flex", flexDirection: "column", overflow: "hidden",
+          borderRadius: "0 0 24px 24px",
+          marginBottom: `calc(${CONTENT_RESERVE}px + env(safe-area-inset-bottom, 0px))`,
+          animation: playEntrance ? "millys-dashboard-in 0.5s cubic-bezier(0.16,1,0.3,1)" : "none",
+        }}
+        onAnimationEnd={() => setPlayEntrance(false)}>
           {/* Topbar */}
           <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 20px", height: 52, borderBottom: "1px solid #EDE8DF", flexShrink: 0 }}>
             <h1 style={{ fontFamily: "var(--font-display), serif", fontStyle: "italic", fontWeight: 300, fontSize: "1.55rem", lineHeight: 1, letterSpacing: "-0.02em", fontVariationSettings: '"SOFT" 100, "WONK" 1', color: CHARCOAL }}>
@@ -106,27 +124,65 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
           <main style={{ flex: 1, overflow: "auto" }}>{children}</main>
         </div>
 
-        {/* Bottom navigation */}
-        <nav style={{ background: SAGE, display: "flex", height: 60, paddingBottom: "env(safe-area-inset-bottom, 0px)", flexShrink: 0 }}>
-          {navItems.map(({ label, href, icon: Icon }) => {
-            const active = isActive(href);
-            return (
-              <Link key={href} href={href} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3, color: active ? "#FAF9F7" : NAV_OFF, textDecoration: "none", fontSize: 10, fontWeight: active ? 600 : 400 }}>
-                <div style={{ height: 5, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  {active && <div style={{ width: 4, height: 4, borderRadius: "50%", background: "#FAF9F7" }} />}
-                </div>
-                <Icon size={18} strokeWidth={active ? 2.2 : 1.6} />
-                <span>{label}</span>
-              </Link>
-            );
-          })}
+        {/* Floating bottom nav — sage pill (matches the desktop sidebar), the
+            active tab's icon pops up in a flat card-white circle, no ring —
+            just a flat card-colored disc against the sage bar, no 3D relief. */}
+        <nav style={{
+          position: "fixed", left: 16, right: 16,
+          bottom: `calc(${NAV_BOTTOM_GAP}px + env(safe-area-inset-bottom, 0px))`,
+          zIndex: NAV_Z_INDEX,
+        }}>
+          <div style={{
+            position: "relative", display: "flex",
+            height: NAV_HEIGHT, background: SAGE, borderRadius: 999,
+            boxShadow: "0 14px 32px rgba(42,39,32,0.28), 0 3px 10px rgba(42,39,32,0.14)",
+          }}>
+            {navItems.map(({ label, href, icon: Icon }) => {
+              const active = isActive(href);
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  style={{
+                    flex: 1, position: "relative", display: "flex", flexDirection: "column",
+                    alignItems: "center", justifyContent: "center", gap: 3,
+                    textDecoration: "none",
+                  }}
+                >
+                  {active && (
+                    <div style={{
+                      position: "absolute", top: -NAV_ICON_POP, left: "50%", transform: "translateX(-50%)",
+                      width: 50, height: 50, borderRadius: "50%",
+                      background: SAGE, border: `3px solid ${CARD}`,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                    }}>
+                      <Icon size={20} strokeWidth={2.2} color={CARD} />
+                    </div>
+                  )}
+                  <div style={{ height: 20, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    {!active && <Icon size={19} strokeWidth={1.6} color={NAV_OFF} />}
+                  </div>
+                  <span style={{ fontSize: 10, fontWeight: active ? 700 : 500, color: active ? CARD : NAV_OFF }}>
+                    {label}
+                  </span>
+                </Link>
+              );
+            })}
+          </div>
         </nav>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-1 min-h-screen p-4" style={{ background: "#F2EBE1" }}>
+    <div
+      className="flex flex-1 min-h-screen p-4"
+      style={{
+        background: "#F2EBE1",
+        animation: playEntrance ? "millys-dashboard-in 0.5s cubic-bezier(0.16,1,0.3,1)" : "none",
+      }}
+      onAnimationEnd={() => setPlayEntrance(false)}
+    >
         <div className="flex flex-1 overflow-hidden" style={{ background: SAGE, borderRadius: 28, border: "1px solid rgba(0,0,0,0.08)", boxShadow: "0 20px 60px rgba(42,39,32,0.14), 0 4px 14px rgba(42,39,32,0.06)" }}>
           {/* Sidebar */}
           <aside style={{ width: 182, flexShrink: 0, background: SAGE, display: "flex", flexDirection: "column", padding: "32px 0 24px", position: "relative", zIndex: 2 }}>

@@ -82,8 +82,8 @@ export const TRANSLATIONS = {
     ahorro: {
       incomeTitle: "Ingresos",
       breakdownTitle: "Reparto sugerido",
-      needs: "Necesidades 50%",
-      wants: "Deseos 30%",
+      needs: "Esencial 50%",
+      wants: "Caprichos 30%",
       savingsTarget: "Ahorro 20%",
       savingsTotalTitle: "Ahorrado este mes",
       aboveTarget: "por encima del objetivo",
@@ -236,8 +236,8 @@ export const TRANSLATIONS = {
     ahorro: {
       incomeTitle: "Income",
       breakdownTitle: "Suggested split",
-      needs: "Needs 50%",
-      wants: "Wants 30%",
+      needs: "Essential 50%",
+      wants: "Treats 30%",
       savingsTarget: "Savings 20%",
       savingsTotalTitle: "Saved this month",
       aboveTarget: "above target",
@@ -390,8 +390,8 @@ export const TRANSLATIONS = {
     ahorro: {
       incomeTitle: "Ingressos",
       breakdownTitle: "Repartiment suggerit",
-      needs: "Necessitats 50%",
-      wants: "Desitjos 30%",
+      needs: "Essencial 50%",
+      wants: "Capritxos 30%",
       savingsTarget: "Estalvi 20%",
       savingsTotalTitle: "Estalviat aquest mes",
       aboveTarget: "per sobre de l'objectiu",
